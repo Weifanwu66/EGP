@@ -11,7 +11,10 @@ This pipeline identifies the presence of a target gene across different *Salmone
 ------
 ## Installation
 To run this pipeline, set up a Conda environment with the required dependencies.
-**1. Clone the Repository**
+1. Clone the Repository
+```sh
+git clone https://github.com/Weifanwu66/Salmonella_Gene_Summary_Pipeline.git
+cd Salmonella_Gene_Summary_Pipeline
 ------
 ```sh
 conda env create -f environment.yml
