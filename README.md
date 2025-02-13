@@ -5,8 +5,11 @@ This pipeline identifies the presence of a target gene across different *Salmone
 
 ## Features
 - **Fetches complete genome assemblies** for important *Salmonella enterica* serotypes using **NCBI Datasets** and **Entrez Direct**.
-- **Processes sequencing data** with **SRA Toolkit, Trimmomatic, and SKESA** and **evaluates assemblies quality** with **SeqKit**.
+- **Fetches and processes raw sequencing data** with **SRA Toolkit, Trimmomatic, and SKESA** and **evaluates assemblies quality** with **SeqKit**.
 - **Perform gene detection** using **BLAST+**.
+- Supports both **Heavy-weight and Light-weight Modes**:
+  - Light-weight Mode: Uses only pre-exisiting complete genomes retrieved from NCBI database for analysis.
+  - Heavy-weight Mode: While still analyzing complete genomes, if a serotype has fewer than 30 complete genomes, the pipeline will automatically retrieve SRA data, assemble the raw sequences, and assess the quality of assemblies.
 - Output results in csv format, including serotype-level gene prevalence.
 ------
 ## Installation
@@ -32,7 +35,8 @@ conda install -c bioconda <package_name>
 ```
 -----
 ## Dependencies
-The pipeline uses the following bioinformatics tools, all installed via Conda:
-| tool | purpose |
-|------|---------|
-| SRAToolkit (sra-tools |
+1. [NCBI Datasets] https://github.com/ncbi/datasets
+-----
+## Flags and Options
+The pipeline provides several flgas to customize execution:
+- -g : 
