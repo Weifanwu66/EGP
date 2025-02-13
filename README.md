@@ -15,6 +15,7 @@ To run this pipeline, set up a Conda environment with the required dependencies.
 ```sh
 git clone https://github.com/Weifanwu66/Salmonella_Gene_Summary_Pipeline.git
 cd Salmonella_Gene_Summary_Pipeline
-------
+
+
 ```sh
 conda env create -f environment.yml
