@@ -62,7 +62,8 @@ bash SGP.sh -g target_genes.fasta -s serotype_list.txt --mode heavy --sra on --s
 ```
 
 ## Output
-An example of the final output file is as follows:
+Examples of the final output file:
+
 Light mode
 | Serotype            | Gene_ID                     | Min_coverage | Min_percentage_of_identity | Total_draft_genomes |  Total_complete_genomes | Complete_genomes_with_target_gene | Percentage_with_target_gene_in_complete_genomes |
 |---------------------|-----------------------------|--------------|----------------------------|---------------------|-------------------------|-----------------------------------|-------------------------------------------------|
@@ -86,5 +87,4 @@ Light mode
 | Hadar               | NC_003197.2:1707344-1707789 | 95           | 95                         | 1927                | 15                      | 15                                | 100.00%                                         |
 | Schwarzengrund      | NC_003197.2:1707344-1707789 | 95           | 95                         | 3038                | 27                      | 27                                | 100.00%                                         |
 | Anatum              | NC_003197.2:1707344-1707789 | 95           | 95                         | 4843                | 40                      | 40                                | 100.00%                                         |
-| Berta               | NC_003197.2:1707344-1707789 | 95           | 95                         | 604                 | 3                       | 3                                 | 100.00%                                         |
-Heavy mode
+| Berta               | NC_003197.2:1707344-1707789 | 95           | 95                         | 604                 | 3                       | 3                                 | 100.00%                                        
