@@ -16,14 +16,14 @@ This pipeline identifies the presence of a target gene across different *Salmone
 To run this pipeline, set up a Conda environment with the required dependencies.
 1. Clone the Repository
 ```sh
-git clone https://github.com/Weifanwu66/Salmonella_Gene_Summary_Pipeline.git
-cd Salmonella_Gene_Summary_Pipeline
+git clone https://github.com/Weifanwu66/SGP.git
+cd SGP
 ```
 2. Create and Activate the Conda Environment
 The pipeline requires a Conda environment with all necessary dependencies. To create and activate it, run:
 ```sh
 conda env create -f environment.yml
-conda activate Salmonella_Gene_Summary
+conda activate SGP
 ```
 To verify the installation, check if all tools are installed:
 ```sh
