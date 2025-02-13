@@ -33,4 +33,6 @@ conda install -c bioconda <package_name>
 -----
 ## Dependencies
 The pipeline uses the following bioinformatics tools, all installed via Conda:
-|tool|purpose|
+| tool | purpose |
+|------|---------|
+| SRAToolkit (sra-tools |
