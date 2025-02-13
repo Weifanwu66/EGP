@@ -143,6 +143,7 @@ echo "Assembly $SRA_ACC passed quality control"
 else
 echo "Assembly $SRA_ACC failed quality control, discarding"
 ((SRA_DROPPED++))
+rm -rf "$SRA_DIR/$SRA_ACC"
 continue
 fi
 echo "Running blast for assembled genome for $SEROTYPE"
