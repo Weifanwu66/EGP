@@ -87,9 +87,9 @@ rm -rf "$UNZIP_DIR/ncbi_dataset"
 done 
 # Set up the output file headers
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "Serotype,Gene_ID,Min_percentage_of_identity,Min_coverage,Total_draft_genomes,Total_complete_genomes,SRA_requested,SRA_dropped,Total_assembled_genomes,Complete_genomes_with_target_genes,Assembled_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_assembled_genomes" > "$OUTPUT_FILE"
+echo -e "Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,SRA_requested,SRA_dropped,Total_assembled_genomes,Complete_genomes_with_target_genes,Assembled_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_assembled_genomes" > "$OUTPUT_FILE"
 else
-echo -e "Serotype,Gene_ID,Min_percentage_of_identity,Min_coverage,Total_draft_genomes,Total_complete_genomes,Complete_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes" > "$OUTPUT_FILE"
+echo -e "Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Complete_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes" > "$OUTPUT_FILE"
 fi
 # Run BLAST on all genomes to check gene presence per serotype
 mapfile -t SEROTYPES < "$SEROTYPE_FILE"
