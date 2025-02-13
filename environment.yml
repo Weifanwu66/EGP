@@ -1,4 +1,4 @@
-name: Salmonella_Gene_Summary_Pipeline
+name: SGP
 channels:
  - bioconda
  - conda-forge
