@@ -15,7 +15,22 @@ To run this pipeline, set up a Conda environment with the required dependencies.
 ```sh
 git clone https://github.com/Weifanwu66/Salmonella_Gene_Summary_Pipeline.git
 cd Salmonella_Gene_Summary_Pipeline
-
-
+```
+2. Create and Activate the Conda Environment
+The pipeline requires a Conda environment with all necessary dependencies. To create and activate it, run:
 ```sh
 conda env create -f environment.yml
+conda activate Salmonella_Gene_Summary
+```
+To verify the installation, check if all tools are installed:
+```sh
+conda list | grep -E "sra-tools|seqkit|trimmomatic|skesa|blast|ncbi-datasets-cli|entrez-direct"
+```
+If any package is missing, please install it manually:
+```sh
+conda install -c bioconda <package_name>
+```
+-----
+## Dependencies
+The pipeline uses the following bioinformatics tools, all installed via Conda:
+|tool|purpose|
