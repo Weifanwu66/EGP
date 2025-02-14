@@ -112,6 +112,7 @@ mkdir -p "$SRA_DIR"
 echo "Processing assemblies for serotypes with total complete genomes under 30, now processing $SEROTYPE"
 esearch -db sra -query "Salmonella enterica AND ${SEROTYPE}" | efetch -format runinfo | awk -F"," 'NR>1 {print $1}' | head -n "$SRA_NUM" > "$SRA_DIR/sra_accessions.txt"
 mapfile -t SRA_ACCESSIONS < "$SRA_DIR/sra_accessions.txt"
+SRA_DROPPED=0
 for SRA_ACC in "${SRA_ACCESSIONS[@]}"; do
 prefetch "$SRA_ACC" --output-directory "$SRA_DIR"
 fasterq-dump "$SRA_DIR/$SRA_ACC/$SRA_ACC.sra" --outdir "$SRA_DIR" --split-files --threads 16
@@ -137,7 +138,6 @@ SEQKIT_STATS=$(seqkit stats --all --tabular "$SRA_DIR/$SRA_ACC/contigs.fasta" | 
 N50=$(echo "$SEQKIT_STATS" | awk '{print $13}')
 TOTAL_CONTIGS=$(echo "$SEQKIT_STATS" | awk '{print $4}')
 LARGEST_CONTIG=$(echo "$SEQKIT_STATS" | awk '{print $8}')
-SRA_DROPPED=0
 if [[ "$N50" -ge 50000 && "$TOTAL_CONTIGS" -lt 100 && "$LARGEST_CONTIG" -ge 200000 ]]; then
 echo "Assembly $SRA_ACC passed quality control"
 else
@@ -162,7 +162,7 @@ TOTAL_COMPLETE_GENOMES=$(find "genomes/$CLEAN_SEROTYPE" -type f -name "*_genomic
 TOTAL_DRAFT_GENOMES=$(awk 'NR>1' "genomes/${CLEAN_SEROTYPE}_draft_genomes.txt" 2>/dev/null | wc -l)
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
 SRA_REQUESTED="$SRA_NUM"
-TOTAL_ASSEMBLED_GENOMES=$(find "$ASSEMBLY_DIR/$CLEAN_SEROTYPE" -type d | wc -l)
+TOTAL_ASSEMBLED_GENOMES=$(find "$ASSEMBLY_DIR/$CLEAN_SEROTYPE" -mindepth 1 -type d | wc -l)
 else
 SRA_REQUESTED=0
 TOTAL_ASSEMBLED_GENOMES=0
@@ -174,7 +174,7 @@ for GENE_ID in $ALL_GENES; do
 if grep -q "^${GENE_ID}$" <<< "$GENE_WITH_HITS"; then
 COMPLETE_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "blast_results/filtered_${CLEAN_SEROTYPE}_results.tsv" 2>/dev/null | sort -u | wc -l)
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
-ASSEMBLED_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "blast_results/filtered_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | sort -u | wc -l)
+ASSEMBLED_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "blast_results/filtered_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | awk -F'_' '{print $1'_'$2}' | sort -u | wc -l)
 else
 ASSEMBLED_GENOMES_WITH_TARGET_GENES=0
 fi
