@@ -87,7 +87,7 @@ rm -rf "$UNZIP_DIR/ncbi_dataset"
 done 
 # Set up the output file headers
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,SRA_requested,SRA_dropped,Total_assembled_genomes,Complete_genomes_with_target_genes,Assembled_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_assembled_genomes" > "$OUTPUT_FILE"
+echo -e "Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,SRA_requested,SRA_dropped_low_assemble_quality,Total_assembled_genomes,Complete_genomes_with_target_genes,Assembled_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_assembled_genomes" > "$OUTPUT_FILE"
 else
 echo -e "Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Complete_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes" > "$OUTPUT_FILE"
 fi
@@ -112,7 +112,6 @@ mkdir -p "$SRA_DIR"
 echo "Processing assemblies for serotypes with total complete genomes under 30, now processing $SEROTYPE"
 esearch -db sra -query "Salmonella enterica AND ${SEROTYPE}" | efetch -format runinfo | awk -F"," 'NR>1 {print $1}' | head -n "$SRA_NUM" > "$SRA_DIR/sra_accessions.txt"
 mapfile -t SRA_ACCESSIONS < "$SRA_DIR/sra_accessions.txt"
-SRA_DROPPED=0
 for SRA_ACC in "${SRA_ACCESSIONS[@]}"; do
 prefetch "$SRA_ACC" --output-directory "$SRA_DIR"
 fasterq-dump "$SRA_DIR/$SRA_ACC/$SRA_ACC.sra" --outdir "$SRA_DIR" --split-files --threads 16
@@ -142,11 +141,12 @@ if [[ "$N50" -ge 50000 && "$TOTAL_CONTIGS" -lt 100 && "$LARGEST_CONTIG" -ge 2000
 echo "Assembly $SRA_ACC passed quality control"
 else
 echo "Assembly $SRA_ACC failed quality control, discarding"
-((SRA_DROPPED++))
-rm -rf "$SRA_DIR/$SRA_ACC"
+rm -rf "$SRA_DIR/$SRA_ACC" #removed the failed assembly
 continue
 fi
 echo "Running blast for assembled genome for $SEROTYPE"
+awk -v sra_acc="$SRA_ACC" '/^>/{$0=">" sra_acc "_" substr($0, 2)}1' "$SRA_DIR/$SRA_ACC/contigs.fasta" > "$SRA_DIR/$SRA_ACC/modified_contigs.fasta"
+mv "$SRA_DIR/$SRA_ACC/modified_contigs.fasta" "$SRA_DIR/$SRA_ACC/contigs.fasta"
 cat "$SRA_DIR/$SRA_ACC/contigs.fasta" >> "$SRA_DIR/combined_assembled_genomes"
 makeblastdb -in "$SRA_DIR/combined_assembled_genomes" -dbtype nucl -out "blast_results/${CLEAN_SEROTYPE}_assembled_db"
 blastn -query "$GENE_FILE" -db "blast_results/${CLEAN_SEROTYPE}_assembled_db" -out "blast_results/${CLEAN_SEROTYPE}_assembled_results.tsv" -outfmt 6 -perc_identity "$MIN_IDENTITY"
@@ -163,9 +163,11 @@ TOTAL_DRAFT_GENOMES=$(awk 'NR>1' "genomes/${CLEAN_SEROTYPE}_draft_genomes.txt" 2
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
 SRA_REQUESTED="$SRA_NUM"
 TOTAL_ASSEMBLED_GENOMES=$(find "$ASSEMBLY_DIR/$CLEAN_SEROTYPE" -mindepth 1 -type d | wc -l)
+SRA_DROPPED=$((SRA_REQUESTED - TOTAL_ASSEMBLED_GENOMES))
 else
 SRA_REQUESTED=0
 TOTAL_ASSEMBLED_GENOMES=0
+SRA_DROPPED=0
 fi
 # Extract all unique gene IDs detected either in complete or assembled genomes
 ALL_GENES=$(grep "^>" "$GENE_FILE" | sed 's/>//' | awk '{print $1}')
@@ -174,7 +176,7 @@ for GENE_ID in $ALL_GENES; do
 if grep -q "^${GENE_ID}$" <<< "$GENE_WITH_HITS"; then
 COMPLETE_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "blast_results/filtered_${CLEAN_SEROTYPE}_results.tsv" 2>/dev/null | sort -u | wc -l)
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
-ASSEMBLED_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "blast_results/filtered_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | awk -F'_' '{print $1'_'$2}' | sort -u | wc -l)
+ASSEMBLED_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "blast_results/filtered_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | awk -F'_' '{print $1}' | sort -u | wc -l)
 else
 ASSEMBLED_GENOMES_WITH_TARGET_GENES=0
 fi
@@ -192,6 +194,13 @@ if [[ "$MODE" == "heavy" ]]; then
 echo -e "$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$SRA_REQUESTED,$SRA_DROPPED,$TOTAL_ASSEMBLED_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,$ASSEMBLED_GENOMES_WITH_TARGET_GENES,$PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES%,$PERCENT_WITH_TARGET_GENES_ASSEMBLED_GENOMES%" >> "$OUTPUT_FILE"
 else
 echo -e "$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,$PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES%"  >> "$OUTPUT_FILE"
+fi
+else
+# If no hits were found for the gene, output 0 %
+if [[ "$MODE" == "heavy" ]]; then
+echo -e "$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$SRA_REQUESTED,$SRA_DROPPED,$TOTAL_ASSEMBLED_GENOMES,0,0,0%,0%" >> "$OUTPUT_FILE"
+else
+echo -e "$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,0,0%" >> "$OUTPUT_FILE"
 fi
 fi
 done
