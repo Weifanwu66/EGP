@@ -76,7 +76,11 @@ mapfile -t ACCESSIONS < <(awk 'NR>1' "$ALL_GENOMES_FILE")
 for LINE in "${ACCESSIONS[@]}"; do
 IFS=$'\t' read -r CLEAN_SEROTYPE ACCESSION <<< "$LINE"
 ZIP_FILE="genomes/$CLEAN_SEROTYPE/$ACCESSION.zip"
-UNZIP_DIR="genomes/${CLEAN_SEROTYPE}"
+UNZIP_DIR="genomes/$CLEAN_SEROTYPE"
+if ls "$UNZIP_DIR/${ACCESSION}"*"_genomic.fna" 1> /dev/null 2>&1; then
+echo "Genome already exists for $CLEAN_SEROTYPE ($ACCESSION), skipping downloading"
+continue
+fi
 echo "Downloading genomes for $CLEAN_SEROTYPE"
 datasets download genome accession "$ACCESSION" --no-progressbar --filename "$ZIP_FILE" &> /dev/null < /dev/null
 echo "Unzipping genome for $CLEAN_SEROTYPE"
@@ -98,10 +102,14 @@ CLEAN_SEROTYPE=$(echo "$SEROTYPE" | sed 's/ /_/g;s/\.//g;s/-/_/g;s/,//g')
 GENOME_DIR="genomes/$CLEAN_SEROTYPE"
 mkdir -p "$GENOME_DIR"
 CONCATENATED_GENOMES="genomes/all_${CLEAN_SEROTYPE}.fna"
+if [[ -f "$CONCATENATED_GENOMES" && -s "$CONCATENATED_GENOMES" && -f "blast_results/${CLEAN_SEROTYPE}_db.nsq" ]]; then
+echo "BLAST database already exists for $CLEAN_SEROTYPE, skipping"
+else
+echo "Making BLAST database and running BLAST for $SEROTYPE"
 find "$GENOME_DIR" -type f -name "*_genomic.fna" -exec cat {} + > "$CONCATENATED_GENOMES"
-echo "Making blast database and running blast for $SEROTYPE"
 makeblastdb -in "$CONCATENATED_GENOMES" -dbtype nucl -out "blast_results/${CLEAN_SEROTYPE}_db"
 blastn -query "$GENE_FILE" -db "blast_results/${CLEAN_SEROTYPE}_db" -out "blast_results/${CLEAN_SEROTYPE}_results.tsv" -outfmt 6 -perc_identity "$MIN_IDENTITY"
+fi
 awk -v min_cov="$MIN_COVERAGE" '(($4/($8 - $7 + 1)) * 100) >= min_cov' "blast_results/${CLEAN_SEROTYPE}_results.tsv" > "blast_results/filtered_${CLEAN_SEROTYPE}_results.tsv"
 TOTAL_DRAFT_GENOMES=$(awk 'NR>1' "genomes/${CLEAN_SEROTYPE}_draft_genomes.txt" 2>/dev/null | wc -l)
 TOTAL_COMPLETE_GENOMES=$(find "$GENOME_DIR" -type f -name "*_genomic.fna" | wc -l)
@@ -109,10 +117,20 @@ TOTAL_COMPLETE_GENOMES=$(find "$GENOME_DIR" -type f -name "*_genomic.fna" | wc -
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
 SRA_DIR="$ASSEMBLY_DIR/${CLEAN_SEROTYPE}"
 mkdir -p "$SRA_DIR"
+if [[ -f "$SRA_DIR/sra_accessions.txt" ]]; then
+echo "Skipping SRA accession retrieval; using existing $SRA_DIR/sra_accessions.txt"
+else
 echo "Processing assemblies for serotypes with total complete genomes under 30, now processing $SEROTYPE"
 esearch -db sra -query "Salmonella enterica AND ${SEROTYPE}" | efetch -format runinfo | awk -F"," 'NR>1 {print $1}' | head -n "$SRA_NUM" > "$SRA_DIR/sra_accessions.txt"
+fi
 mapfile -t SRA_ACCESSIONS < "$SRA_DIR/sra_accessions.txt"
 for SRA_ACC in "${SRA_ACCESSIONS[@]}"; do
+# Skip processing if all expected FASTQ files exist
+if [[ -f "$SRA_DIR/${SRA_ACC}_paired_1.fastq" && -f "$SRA_DIR/${SRA_ACC}_paired_2.fastq" && \
+      -f "$SRA_DIR/${SRA_ACC}_unpaired_1.fastq" && -f "$SRA_DIR/${SRA_ACC}_unpaired_2.fastq" ]]; then
+     echo "Skipping assembly for $SRA_ACC; FASTQ files already exist."
+continue
+fi
 prefetch "$SRA_ACC" --output-directory "$SRA_DIR"
 fasterq-dump "$SRA_DIR/$SRA_ACC/$SRA_ACC.sra" --outdir "$SRA_DIR" --split-files --threads 16
 SEQ_PLATFORM=$(esearch -db sra -query "$SRA_ACC" | efetch -format runinfo | awk -F"," 'NR==2 {print $20}')

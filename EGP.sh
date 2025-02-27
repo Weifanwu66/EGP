@@ -57,7 +57,7 @@ echo -e "Species\tSerotype\tAccessions" > "$ALL_GENOMES_FILE"
 sed -i 's/ \+/\t/g' "$SPECIES_SEROTYPE_FILE"
 awk '{
 species = $1 " " $2;
-serotype = (NF > 2) ? $3 : "NA";
+serotype = (NF > 2) ? substr($0, index($0, $3)) : "NA";
 print species "\t" serotype;
 }' "$SPECIES_SEROTYPE_FILE" > temp_file && mv temp_file "$SPECIES_SEROTYPE_FILE"
 mapfile -t LINES < "$SPECIES_SEROTYPE_FILE"
@@ -66,56 +66,53 @@ IFS=$'\t' read -r SPECIES SEROTYPE <<< "$LINE"
 SPECIES=$(echo "$SPECIES" | xargs)
 SEROTYPE=$(echo "$SEROTYPE" | xargs)
 CLEAN_SEROTYPE=$(echo "$SEROTYPE" | sed 's/\.//g; s/,//g; s/ /_/g; s/-/_/g; s/\[//g; s/\]//g')
-if [[ "$SPECIES" != "Salmonella enterica" ]]; then
-SEROTYPE=""
+CLEAN_SPECIES=$(echo "$SPECIES" | sed 's/\.//g; s/,//g; s/ /_/g; s/-/_/g; s/\[//g; s/\]//g')
+if [[ "$SEROTYPE" == "NA" ]]; then
 CLEAN_SEROTYPE=""
-fi
-echo "Retrieving assembly accessions for $SPECIES $SEROTYPE"
-if [[ "$SPECIES" == "Salmonella enterica" ]]; then
-GENOME_DIR="EB_genomes/${SPECIES}_${CLEAN_SEROTYPE}"
-else
-GENOME_DIR="EB_genomes/${SPECIES}"
-fi 
+echo "Downloading complete genomes for $SPECIES directly using ncbi-datasets tool"
+GENOME_DIR="EB_genomes/${CLEAN_SPECIES}"
 mkdir -p "$GENOME_DIR"
-if [[ "$SPECIES" == "Salmonella enterica" ]]; then
-QUERY="Salmonella enterica AND $SEROTYPE"
-else
-QUERY="$SPECIES"
+datasets download genome taxon "$SPECIES" --assembly-level complete --filename "EB_genomes/${CLEAN_SPECIES}.zip"
+if [[ ! -s "EB_genomes/${CLEAN_SPECIES}.zip" ]]; then
+echo "ERROR: No genomes downloaded for $SPECIES"
+continue
 fi
-esearch -db assembly -query "$QUERY" | efetch -format docsum | xtract -pattern DocumentSummary -element AssemblyAccession,AssemblyStatus,Organism > "${GENOME_DIR}/accessions_raw.txt"
+unzip -q -o "EB_genomes/${CLEAN_SPECIES}.zip" -d "$GENOME_DIR"
+mv "${GENOME_DIR}/ncbi_dataset/data/"*/*_genomic.fna "${GENOME_DIR}" 2>/dev/null
+rm -rf "${GENOME_DIR}/ncbi_dataset"
+rm -rf "EB_genomes/${CLEAN_SPECIES}.zip"
+else
+echo "Retrieving assembly accessions for $SPECIES $SEROTYPE using esearch"
+QUERY="$SPECIES[Organism] AND $SEROTYPE[All Fields]"
+GENOME_DIR="EB_genomes/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}"
+mkdir -p "$GENOME_DIR"
+esearch -db assembly -query "$QUERY AND complete genome [filter]" | efetch -format docsum | xtract -pattern DocumentSummary -element AssemblyAccession,Organism > "${GENOME_DIR}/accessions.txt"
 # Filter out Typhimurium var. 5- from Typhimurium
 if [[ "$SPECIES" == "Salmonella enterica" && "$SEROTYPE" == "Typhimurium" ]]; then
-grep -v "var. 5-" "${GENOME_DIR}/accessions_raw.txt" > "${GENOME_DIR}/accessions.txt"
-else
-mv "${GENOME_DIR}/accessions_raw.txt" "${GENOME_DIR}/accessions.txt"
+grep -v "var. 5-" "${GENOME_DIR}/accessions.txt" > "${GENOME_DIR}/filtered_accessions.txt"
+mv "${GENOME_DIR}/filtered_accessions.txt" "${GENOME_DIR}/accessions.txt"
 fi
-# Define accessions for complete genomes and save them to all_genomes.tsv"
-if [[ "$SPECIES" == "Salmonella enterica" ]]; then
-grep "Complete Genome" "${GENOME_DIR}/accessions.txt" | awk -v species="$SPECIES" -v serotype="$CLEAN_SEROTYPE" '{print species "\t" serotype "\t" $1}' >> "$ALL_GENOMES_FILE"
-else
-grep "Complete Genome" "${GENOME_DIR}/accessions.txt" | awk -v species="$SPECIES" -v serotype="$CLEAN_SEROTYPE" '{print species "\tNA\t" $1}' >> "$ALL_GENOMES_FILE"
+# Store accessions with their corresponding organisms in all_genomes.tsv file
+cat "${GENOME_DIR}/accessions.txt" | awk -v species="$CLEAN_SPECIES" -v serotype="$CLEAN_SEROTYPE" '{print species"\t"serotype"\t"$1}' >> "$ALL_GENOMES_FILE"
+# Download genome files based on accessions
+mapfile -t LINES < "$ALL_GENOMES_FILE"
+for LINE in "${LINES[@]}"; do
+IFS=$'\t' read -r CLEAN_SPECIES CLEAN_SEROTYPE ACCESSION <<< "$LINE"
+GENOME_DIR="EB_genomes/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}"
+ZIP_FILE="$GENOME_DIR/$ACCESSION.zip"
+if ls "$GENOME_DIR/${ACCESSION}"*"_genomic.fna" 1> /dev/null 2>&1; then
+echo "Genome already exists for $CLEAN_SPECIES $CLEAN_SEROTYPE ($ACCESSION), skipping downloading"
+continue
 fi
-grep -v "Complete Genome" "${GENOME_DIR}/accessions.txt" > "${GENOME_DIR}/draft_genomes.txt"
-done
-# Download genome files based on accessions per species/serotype
-mapfile -t ACCESSIONS < <(awk 'NR>1' "$ALL_GENOMES_FILE")
-for LINE in "${ACCESSIONS[@]}"; do
-IFS=$'\t' read -r SPECIES CLEAN_SEROTYPE ACCESSION <<< "$LINE"
-if [[ "$SPECIES" == "Salmonella enterica" ]]; then
-ZIP_FILE="EB_genomes/${SPECIES}_${CLEAN_SEROTYPE}/$ACCESSION.zip"
-UNZIP_DIR="EB_genomes/${SPECIES}_${CLEAN_SEROTYPE}"
-else
-ZIP_FILE="EB_genomes/${SPECIES}/$ACCESSION.zip"
-UNZIP_DIR="EB_genomes/${SPECIES}"
-fi
-echo "Downloading genomes for $SPECIES $CLEAN_SEROTYPE"
+echo "Downloading genomes for $CLEAN_SPECIES $CLEAN_SEROTYPE"
 datasets download genome accession "$ACCESSION" --no-progressbar --filename "$ZIP_FILE" &> /dev/null < /dev/null
-echo "Unzipping genomes for $SPECIES $CLEAN_SEROTYPE"
-unzip -q -o "$ZIP_FILE" -d "$UNZIP_DIR"
-mv "$UNZIP_DIR/ncbi_dataset/data/"*/*_genomic.fna "$UNZIP_DIR/" 2>/dev/null
-rm "$ZIP_FILE"
-rm -rf "$UNZIP_DIR/ncbi_dataset"
-done 
+unzip -q -o "$ZIP_FILE" -d "$GENOME_DIR"
+mv "$GENOME_DIR/ncbi_dataset/data/"*/*_genomic.fna "$GENOME_DIR" 2>/dev/null
+rm "$ZIP_FILE" 
+rm -rf "$GENOME_DIR/ncbi_dataset"
+done
+fi
+done
 # Set up the output file headers
 if [[ "$MODE" == "heavy" ]]; then
 echo -e "Species,Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,SRA_requested,SRA_dropped,Total_assembled_genomes,Complete_genomes_with_target_genes,Assembled_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_assembled_genomes" > "$OUTPUT_FILE"
@@ -128,35 +125,36 @@ for LINE in "${LINES[@]}"; do
 IFS=$'\t' read -r SPECIES SEROTYPE <<< "$LINE"
 CLEAN_SPECIES=$(echo "$SPECIES" | sed 's/ /_/g')
 CLEAN_SEROTYPE=$(echo "$SEROTYPE" | sed 's/ /_/g;s/\.//g;s/-/_/g;s/,//g')
-if [[ "$SPECIES" == "Salmonella enterica" ]]; then
-GENOME_DIR="EB_genomes/${SPECIES}_${CLEAN_SEROTYPE}"
+if [[ "$SEROTYPE" == "NA" ]]; then
+CLEAN_SEROTYPE=""
+GENOME_DIR="EB_genomes/${CLEAN_SPECIES}"
 else
-GENOME_DIR="EB_genomes/${SPECIES}"
+GENOME_DIR="EB_genomes/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}"
 fi
 mkdir -p "$GENOME_DIR"
 CONCATENATED_GENOMES="$GENOME_DIR/combined.fna"
 find "$GENOME_DIR" -type f -name "*_genomic.fna" -exec cat {} + > "$CONCATENATED_GENOMES"
-echo "Making blast database and running blast for $SEROTYPE"
-if [[ "$SPECIES" == "Salmonella enterica" ]]; then
+echo "Making blast database and running blast for $SPECIES $SEROTYPE"
+if [[  -n "$CLEAN_SEROTYPE" ]]; then
 BLAST_DB="EB_blast_results/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_db"
 BLAST_OUTPUT="EB_blast_results/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_results.tsv"
-FILTERED_BLAST_OUTPUT="EB_blast_results/filtered_${SPECIES}_${CLEAN_SEROTYPE}_results.tsv"
+FILTERED_BLAST_OUTPUT="EB_blast_results/filtered_${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_results.tsv"
 else
 BLAST_DB="EB_blast_results/${CLEAN_SPECIES}_db"
 BLAST_OUTPUT="EB_blast_results/${CLEAN_SPECIES}_results.tsv"
-FILTERED_BLAST_OUTPUT="EB_blast_results/filtered_${SPECIES}_results.tsv"
+FILTERED_BLAST_OUTPUT="EB_blast_results/filtered_${CLEAN_SPECIES}_results.tsv"
 fi
 makeblastdb -in "$CONCATENATED_GENOMES" -dbtype nucl -out "$BLAST_DB"
 blastn -query "$GENE_FILE" -db "$BLAST_DB" -out "$BLAST_OUTPUT" -outfmt 6 -perc_identity "$MIN_IDENTITY"
-awk -v min_cov="$MIN_COVERAGE" '(($4/($8 - $7 + 1)) * 100) >= min_cov' "$BLAST_OUTPUT" > "$FILTERED_BLAST_OUTPUT"
-TOTAL_DRAFT_GENOMES=$(awk 'NR>1' "$GENOME_DIR/draft_genomes.txt" 2>/dev/null | wc -l)
+sync
+awk -v min_cov="$MIN_COVERAGE" '(($4/($8 - $7 + 1)) * 100) >= min_cov' "$BLAST_OUTPUT" > "$FILTERED_BLAST_OUTPUT" 
 TOTAL_COMPLETE_GENOMES=$(find "$GENOME_DIR" -type f -name "*_genomic.fna" | wc -l)
 # When heavy mode is on and complete genomes are less than 30
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
-SRA_DIR="$ASSEMBLY_DIR/${SPECIES}_${CLEAN_SEROTYPE}"
+SRA_DIR="$ASSEMBLY_DIR/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}"
 mkdir -p "$SRA_DIR"
 echo "Processing assemblies for Salmonella serotypes with total complete genomes under 30, now processing $SEROTYPE"
-esearch -db sra -query "Salmonella enterica AND ${SEROTYPE}" | efetch -format runinfo | awk -F"," 'NR>1 {print $1}' | head -n "$SRA_NUM" > "$SRA_DIR/sra_accessions.txt"
+esearch -db sra -query "${SPECIES} AND ${SEROTYPE}" | efetch -format runinfo | awk -F"," 'NR>1 {print $1}' | head -n "$SRA_NUM" > "$SRA_DIR/sra_accessions.txt"
 mapfile -t SRA_ACCESSIONS < "$SRA_DIR/sra_accessions.txt"
 for SRA_ACC in "${SRA_ACCESSIONS[@]}"; do
 prefetch "$SRA_ACC" --output-directory "$SRA_DIR"
@@ -192,27 +190,31 @@ continue
 fi
 echo "Running blast for assembled genome for $SEROTYPE"
 cat "$SRA_DIR/$SRA_ACC/contigs.fasta" >> "$SRA_DIR/combined_assembled_genomes"
-makeblastdb -in "$SRA_DIR/combined_assembled_genomes" -dbtype nucl -out "EB_blast_results/${CLEAN_SEROTYPE}_assembled_db"
-blastn -query "$GENE_FILE" -db "EB_blast_results/${CLEAN_SEROTYPE}_assembled_db" -out "EB_blast_results/${CLEAN_SEROTYPE}_assembled_results.tsv" -outfmt 6 -perc_identity "$MIN_IDENTITY"
-awk -v min_cov="$MIN_COVERAGE" '(($4/($8 - $7 + 1))*100) >= min_cov' "EB_blast_results/${CLEAN_SEROTYPE}_assembled_results.tsv" > "EB_blast_results/filtered_${CLEAN_SEROTYPE}_assembled_results.tsv"
+makeblastdb -in "$SRA_DIR/combined_assembled_genomes" -dbtype nucl -out "EB_blast_results/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_assembled_db"
+blastn -query "$GENE_FILE" -db "EB_blast_results/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_assembled_db" -out "EB_blast_results/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_assembled_results.tsv" -outfmt 6 -perc_identity "$MIN_IDENTITY"
+awk -v min_cov="$MIN_COVERAGE" '(($4/($8 - $7 + 1))*100) >= min_cov' "EB_blast_results/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_assembled_results.tsv" > "EB_blast_results/filtered_${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_assembled_results.tsv"
 done
 fi
 done
 # Ensure serotypes are loaded and process results for each serotype
 mapfile -t LINES < "$SPECIES_SEROTYPE_FILE"
-IFS=$'\t' read -r SPECIES SEROTYPES <<< "$LINES"
 for LINE in "${LINES[@]}"; do
+IFS=$'\t' read -r SPECIES SEROTYPE <<< "$LINE"
 CLEAN_SEROTYPE=$(echo "$SEROTYPE" | sed 's/ /_/g; s/-/_/g; s/\.//g; s/,//g')
-if [[ "$SPECIES" == "Salmonella enterica" ]]; then
-GENOME_DIR="EB_genomes/${SPECIES}_${CLEAN_SEROTYPE}"
+CLEAN_SPECIES=$(echo "$SPECIES" | sed 's/ /_/g')
+if [[ "$SEROTYPE" != "NA" ]]; then
+GENOME_DIR="EB_genomes/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}"
+TOTAL_DRAFT_COUNT=$(esearch -db assembly -query "$SPECIES AND $SEROTYPE AND (latest[filter] AND all[filter] NOT complete genome[filter])" | xtract -pattern Count -element Count)
 else
-GENOME_DIR="EB_genomes/${SPECIES}"
+CLEAN_SEROTYPE=""
+GENOME_DIR="EB_genomes/${CLEAN_SPECIES}"
+TOTAL_DRAFT_COUNT=$(esearch -db assembly -query "$SPECIES[Organism] AND (latest[filter] AND all[filter] NOT complete genome[filter])" | xtract -pattern Count -element Count)
 fi
+FILTERED_BLAST_OUTPUT="EB_blast_results/filtered_${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_results.tsv"
 TOTAL_COMPLETE_GENOMES=$(find "$GENOME_DIR" -type f -name "*_genomic.fna" | wc -l)
-TOTAL_DRAFT_GENOMES=$(awk 'NR>1' "$GENOME_DIR/draft_genomes.txt" 2>/dev/null | wc -l)
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
 SRA_REQUESTED="$SRA_NUM"
-TOTAL_ASSEMBLED_GENOMES=$(find "$ASSEMBLY_DIR/$CLEAN_SEROTYPE" -mindepth 1 -type d | wc -l)
+TOTAL_ASSEMBLED_GENOMES=$(find "$ASSEMBLY_DIR/${CLEAN_SPECIES}_${CLEAN_SEROTYPE}" -mindepth 1 -type d | wc -l)
 SRA_DROPPED=$((SRA_REQUESTED - TOTAL_ASSEMBLED_GENOMES))
 else
 SRA_REQUESTED=0
@@ -220,13 +222,13 @@ SRA_DROPPED=0
 TOTAL_ASSEMBLED_GENOMES=0
 fi
 # Extract all unique gene IDs detected either in complete or assembled genomes
-ALL_GENES=$(grep "^>" "$GENE_FILE" | sed 's/>//' | awk '{print $1}')
-GENE_WITH_HITS=$(awk '{print $1}' "$FILTERED_BLAST_OUTPUT" 2>/dev/null; awk '{print $1}' "EB_blast_results/filtered_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | sort -u)
-for GENE_ID in $ALL_GENES; do
+GENE_WITH_HITS=$(awk '{print $1}' "$FILTERED_BLAST_OUTPUT" 2>/dev/null; awk '{print $1}' "EB_blast_results/filtered_${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | sort -u)
+mapfile -t ALL_GENES < <(grep "^>" "$GENE_FILE" | sed 's/>//' | awk '{print $1}')
+for GENE_ID in "${ALL_GENES[@]}"; do
 if grep -q "^${GENE_ID}$" <<< "$GENE_WITH_HITS"; then
-COMPLETE_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "$FILTERED_BLAST_OUTPUT" 2>/dev/null | sort -u | wc -l)
+COMPLETE_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "$FILTERED_BLAST_OUTPUT" | sort -u | wc -l)
 if [[ "$MODE" == "heavy" && "$TOTAL_COMPLETE_GENOMES" -lt 30 && "$SRA_FLAG" == "on" ]]; then
-ASSEMBLED_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "EB_blast_results/filtered_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | awk -F'_' '{print $1"_"$2}' | sort -u | wc -l)
+ASSEMBLED_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "EB_blast_results/filtered_${CLEAN_SPECIES}_${CLEAN_SEROTYPE}_assembled_results.tsv" 2>/dev/null | awk -F'_' '{print $1"_"$2}' | sort -u | wc -l)
 else
 ASSEMBLED_GENOMES_WITH_TARGET_GENES=0
 fi
@@ -240,20 +242,17 @@ PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES=$(echo "scale=2; ($COMPLETE_GENOMES_W
 else
 PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES=0
 fi
-if [[ "$SPECIES" != "Salmonella enterica" ]]; then
-SEROTYPE="NA"
-fi
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "$SPECIES,$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$SRA_REQUESTED,$SRA_DROPPED,$TOTAL_ASSEMBLED_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,$ASSEMBLED_GENOMES_WITH_TARGET_GENES,$PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES%,$PERCENT_WITH_TARGET_GENES_ASSEMBLED_GENOMES%" >> "$OUTPUT_FILE"
+echo -e "$SPECIES,$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_COUNT,$TOTAL_COMPLETE_GENOMES,$SRA_REQUESTED,$SRA_DROPPED,$TOTAL_ASSEMBLED_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,$ASSEMBLED_GENOMES_WITH_TARGET_GENES,$PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES%,$PERCENT_WITH_TARGET_GENES_ASSEMBLED_GENOMES%" >> "$OUTPUT_FILE"
 else
-echo -e "$SPECIES,$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,$PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES%"  >> "$OUTPUT_FILE"
+echo -e "$SPECIES,$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_COUNT,$TOTAL_COMPLETE_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,$PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES%"  >> "$OUTPUT_FILE"
 fi
 else
 # If no hits were found for the gene in a serotype, output is recorded as 0%
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$SRA_REQUESTED,$SRA_DROPPED,$TOTAL_ASSEMBLED_GENOMES,0,0,0%,0%" >> "$OUTPUT_FILE"
+echo -e "$SPECIES,$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_COUNT,$TOTAL_COMPLETE_GENOMES,$SRA_REQUESTED,$SRA_DROPPED,$TOTAL_ASSEMBLED_GENOMES,0,0,0%,0%" >> "$OUTPUT_FILE"
 else
-echo -e "$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,0,0%" >> "$OUTPUT_FILE"
+echo -e "$SPECIES,$SEROTYPE,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_COUNT,$TOTAL_COMPLETE_GENOMES,0,0%" >> "$OUTPUT_FILE"
 fi
 fi
 done
