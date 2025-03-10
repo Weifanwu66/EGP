@@ -134,7 +134,13 @@ while IFS="$DELIMITER" read -r genus species_or_serotype || [[ -n "$genus" ]]; d
 [[ -z "$genus" ]] && continue
 TOTAL_COMPLETE_GENOMES=$(get_total_genomes_count "$genus" "$species_or_serotype" "complete") 
 TOTAL_DRAFT_GENOMES=$(get_total_genomes_count "$genus" "$species_or_serotype" "contig")
-# Extract all unique gene IDs detected either in complete or in draft genomes
+if [[ "$MODE" == "heavy" ]]; then
+ITERATIONS=$(( TOTAL_DRAFT_GENOMES / DRAFT_SAMPLE_SIZE ))
+(( ITERATIONS < 1 )) && ITERATIONS=1
+(( ITERATIONS > MAX_ITERATIONS )) && ITERATIONS=$MAX_ITERATIONS
+else
+ITERATIONS=0
+fi
 local_taxon="$genus"
 [[ -n "$species_or_serotype" ]] && local_taxon+="_${species_or_serotype}"
 GENE_WITH_HITS=$(awk '{print $1}' "$FILTERED_BLAST_RESULT_DIR/filtered_${local_taxon}_complete_blast_results.txt" 2>/dev/null)
@@ -164,7 +170,7 @@ else
 PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES=0
 fi
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$DRAFT_SAMPLE_SIEZ,$ITERATIONS,$COMPLETE_GENOMES_WITH_TARGET_GENES,$DRAFT_GENOMES_WITH_TARGET_GENES,${PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES}%,${PERCENT_WITH_TARGET_GENES_DRAFT_GENOMES}%" >> "$OUTPUT_FILE"
+echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$DRAFT_SAMPLE_SIZE,$ITERATIONS,$COMPLETE_GENOMES_WITH_TARGET_GENES,$DRAFT_GENOMES_WITH_TARGET_GENES,${PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES}%,${PERCENT_WITH_TARGET_GENES_DRAFT_GENOMES}%" >> "$OUTPUT_FILE"
 else
 echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,${PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES}%"  >> "$OUTPUT_FILE"
 fi
