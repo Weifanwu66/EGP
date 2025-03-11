@@ -6,7 +6,6 @@ MIN_IDENTITY=90
 WORK_DIR=$(pwd)
 TAXON_FILE=""
 GENE_FILE=""
-SEROTYPE_TAXID_FILE="${WORK_DIR}/database/salmonella_serotype_taxids.txt"
 OUTPUT_FILE="${WORK_DIR}/result/EB_gene_summary.csv"
 EB_GENOMES_DIR="${WORK_DIR}/database/EB_complete_genomes"
 EB_DRAFT_GENOMES_DIR="${WORK_DIR}/database/EB_draft_genomes"
@@ -18,6 +17,7 @@ DRAFT_BLAST_RESULT_DIR="${WORK_DIR}/result/draft_EB_blast_results"
 FILTERED_DRAFT_BLAST_RESULT_DIR="${WORK_DIR}/result/filtered_draft_EB_blast_results"
 DRAFT_SAMPLE_SIZE=100
 MAX_ITERATIONS=50
+OVERWRITE=false
 # usage setup
 usage(){
 echo "Usage: $0 -g GENE_FILE [-t TAXON_FILE] [-c COVERAGE] [-i IDENTITY] [-o OUTPUT_FILE] [--draft-sample N] [--mode light|heavy]"
@@ -28,6 +28,7 @@ echo "-i IDENTITY : The minimum percentage of identity (default: 90%)."
 echo "-o OUTPUT_FILE : Output result file (default: EB_gene_summary.tsv)."
 echo "--draft-sample N : Number of draft genomes to randomly select per iteration (default: 100)."
 echo "--mode light|heavy : Run in light mode (complete genomes only) or heavy mode (complete+draft genomes, default: light)."
+echo "--overwrite : If overwrite mode is enabled, previous results will be cleared (default: false)."
 }
 # Parse argument
 while [[ "$#" -gt 0 ]]; do
@@ -39,11 +40,15 @@ case "$1" in
 -o) OUTPUT_FILE="$2"; shift ;;
 --draft-sample) DRAFT_SAMPLE_SIZE="$2"; shift ;;
 --mode) MODE="$2"; shift ;;
+--overwrite) OVERWRITE=true ;;
 -h|--help) usage; exit 0 ;;
 *) echo "Invalid option: $1"; usage; exit 1 ;;
 esac
 shift
 done 
+if [[ "$OVERWRITE" == true ]]; then
+rm -rf "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR" "$DRAFT_BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR" "$OUTPUT_FILE"
+fi
 # Ensure gene file is provided
 if [[ -z "$GENE_FILE" ]]; then
 echo "Error! Please provide a gene sequence file!"
@@ -58,30 +63,26 @@ fi
 # Output directory setup
 mkdir -p "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR"
 source "${WORK_DIR}/function.sh"
-# Auto detect delimiter of user's input file
+# Set delimiter as a space
 if [[ -n "$TAXON_FILE" ]]; then
-FIRST_LINE=$(head -n 1 "$TAXON_FILE")
-if [[ "$FIRST_LINE" == *$'\t'* ]]; then
-DELIMITER=$'\t'
-elif [[ "$FIRST_LINE" == *" "* ]]; then
-DELIMITER=$' '
-elif [[ "$FIRST_LINE" == *","* ]]; then
-DELIMITER=","
-else
-echo "Unknown delimiter in file. Ensure it is tab, comma, or space-separate."
-exit 1
-fi
+DELIMITER=" "
+sed 's/[\t,]\+/ /g' "$TAXON_FILE" > "${TAXON_FILE}_processed"
 # Ensure if a taxon file is provided, the genus should be one of the target Enterobacteriaceae
 awk -v delim="$DELIMITER" '
-BEGIN { FS=delim }
+BEGIN { FS=delim; OFS=delim }
 { 
-if ($1 !~ /^(Salmonella|Escherichia|Citrobacter|Enterobacter|Klebsiella|Shigella|Cronobacter)$/) {
+gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+genus = $1
+species_or_serotype = ($2 != "") ? $2 : ""
+if (genus !~ /^(Salmonella|Escherichia|Citrobacter|Enterobacter|Klebsiella|Shigella|Cronobacter)$/) {
 print "Error: Invalid genus in taxon file. Allowed: Salmonella, Escherichia, Citrobacter, Enterobacter, Klebsiella, Shigella, Cronobacter."
 print "Your line:", $0
 exit 1 
 }
-}' "$TAXON_FILE" || exit 1
-
+}' "${TAXON_FILE}_processed" || exit 1
+rm "${TAXON_FILE}_processed"
+fi
 # start with core processing functions
 process_complete_genomes() {
 perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$BLAST_RESULT_DIR" "" "$TAXON_FILE"
@@ -111,13 +112,13 @@ filter_blast_results "${blast_result_file}" "$FILTERED_DRAFT_BLAST_RESULT_DIR" "
 done
 }
 echo "Running in $MODE mode"
-echo "Processing complete genomes"
 process_complete_genomes
 # When heavy mode is on
 if [[ "$MODE" == "heavy" ]]; then
-echo "Processing draft genomes"
 while IFS="$DELIMITER" read -r genus species_or_serotype || [[ -n "$genus" ]]; do
 [[ -z "$genus" ]] && continue
+genus=$(echo "$genus" | xargs)
+species_or_serotype=$(echo "species_or_serotype" | xargs)
 process_draft_genomes "$genus" "$species_or_serotype"
 done < "$TAXON_FILE"
 fi
@@ -129,9 +130,17 @@ else
 echo -e "Genus,Species_or_Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Complete_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes" > "$OUTPUT_FILE"
 fi
 # Ensure serotypes are loaded and process results for each serotype
-while IFS="$DELIMITER" read -r genus species_or_serotype || [[ -n "$genus" ]]; do
-# skip empty lines
-[[ -z "$genus" ]] && continue
+if [[ -z "$TAXON_FILE" ]]; then
+echo "No taxon file provided. Extracting taxa from pre-built BLAST database"
+# Rmove numeric suffix and convert underscores and dots to spaces
+TAXON_LIST=$(find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed -E '/[._][0-9]{2}$/s/[._][0-9]{2}$//' | sort -u)
+else
+TAXON_LIST=$(< "$TAXON_FILE")
+fi
+echo "$TAXON_LIST" | while IFS="$DELIMITER" read -r line || [[ -n "$line" ]]; do
+genus=$(echo "$line" | awk '{print $1}' | xargs)
+species_or_serotype=$(echo "$line" | awk '{$1=""; print $0}' | xargs)
+[[ "$genus" == "$line" ]] && species_or_serotype=""
 TOTAL_COMPLETE_GENOMES=$(get_total_genomes_count "$genus" "$species_or_serotype" "complete") 
 TOTAL_DRAFT_GENOMES=$(get_total_genomes_count "$genus" "$species_or_serotype" "contig")
 if [[ "$MODE" == "heavy" ]]; then
@@ -183,5 +192,5 @@ echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL
 fi
 fi
 done
-done < "$TAXON_FILE"
+done
 echo "Analysis complete. Results saved in $OUTPUT_FILE"
