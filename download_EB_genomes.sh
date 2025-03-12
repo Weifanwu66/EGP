@@ -7,37 +7,46 @@ ASSEMBLY_LEVEL="complete"
 EB_GENUS=("Escherichia" "Salmonella" "Shigella" "Klebsiella" "Enterobacter" "Cronobacter" "Citrobacter")
 source "$WORKDIR/function.sh"
 # Build a function to download genomes using datasets (for genus and species only)
-download_genomes() {
-TAXON="$1"
-CLEAN_TAXON=$(clean_taxons "$TAXON" )
-#Define download directory based on level
-GENUS=$(echo "$TAXON" | awk '{print $1}')
-SPECIES=$(echo "$TAXON" | awk '{print $1, $2}')
-CLEAN_SPECIES=$(clean_taxons "$SPECIES")
-if [[ "$GENUS" == "Salmonella" && "$SPECIES" == "Salmonella enterica" ]]; then
-return
-elif [[ "$GENUS" == "Salmonella" && "$SPECIES" == "Salmonella bongori" ]]; then
-DOWNLOAD_DIR="${GENOME_DIR}/Salmonella/Salmonella_bongori"
-else
-DOWNLOAD_DIR="${GENOME_DIR}/${GENUS}/${CLEAN_SPECIES}"
+download_genus() {
+local genus="$1"
+local download_dir="$GENOME_DIR/$genus/aggregated"
+if [[ -n "$(find "$download_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
+echo "Genomes exist for $genus, skipping"
+return 0
 fi
-if [[ -n "$(find "$DOWNLOAD_DIR" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
-echo "Genomes already exist for $TAXON, skipping donwloading"
-return
+mkdir -p "$download_dir"
+local zip_file="${download_dir}.zip"
+echo "Downloading genus: $genus"
+datasets download genome taxon "$genus" --assembly-level "$ASSEMBLY_LEVEL" --filename "$zip_file"
+unzip -q -o "$zip_file" -d "$download_dir"
+rm -f "$zip_file"
+find "$download_dir" -type f -name "*_genomic.fna" -exec mv {} "$download_dir" \;
+rm -rf "$download_dir/ncbi_dataset"
+echo "Downloaded and organized genomes for $genus"
+}
+download_species() {
+local species="$1"
+local genus=$(echo "$species" | awk '{print $1}')
+local clean_species=$(echo "$species" | sed 's/ /_/g')
+local taxon_dir="$GENOME_DIR/$genus/$clean_species"
+mkdir -p "$taxon_dir/aggregated"
+if [[ -n "$(find "$taxon_dir/aggregated" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
+echo "Genomes already exist for $species, skipping donwloading"
+return 0
 fi
-ZIP_FILE="${DOWNLOAD_DIR}.zip"
-mkdir -p "${DOWNLOAD_DIR}"
-echo "Downloading genomes for $TAXON..."
-datasets download genome taxon "$TAXON" --assembly-level "$ASSEMBLY_LEVEL" --filename "${ZIP_FILE}"
-unzip -q -o "${ZIP_FILE}" -d "${DOWNLOAD_DIR}"
-rm -rf "${ZIP_FILE}"
+local zip_file="${taxon_dir}.zip"
+echo "Downloading genomes for $species"
+datasets download genome taxon "$species" --assembly-level "$ASSEMBLY_LEVEL" --filename "$zip_file"
+unzip -q -o "$zip_file" -d "$taxon_dir"
+rm -rf "$zip_file"
 # Move genomic FASTA files to correct location
-find "${DOWNLOAD_DIR}" -type f -name "*_genomic.fna" -exec mv {} "${DOWNLOAD_DIR}" \;
-rm -rf "${DOWNLOAD_DIR}/ncbi_dataset"
-echo "Downloaded and organized genomes for $TAXON"
+find "$taxon_dir" -type f -name "*_genomic.fna" -exec mv {} "$taxon_dir" \;
+rm -rf "$taxon_dir/ncbi_dataset"
+echo "Downloaded and organized genomes for $species"
 }
 get_salmonella_serotype_taxid() {
-esearch -db taxonomy -query "Salmonella enterica subsp. enterica[Subtree]" | efetch -format xml | xtract -pattern Taxon -element TaxId,ScientificName | grep -v -E "str\.|var\."  > salmonella_serotype_taxids.txt
+esearch -db taxonomy -query "Salmonella enterica subsp. enterica[Subtree]" | efetch -format xml | xtract -pattern Taxon -element TaxId,ScientificName | grep -v -E "str\.|var\." | \
+grep -v "Salmonella enterica subsp. enterica$" > salmonella_serotype_taxids.txt
 echo "Saved all serotype Taxon IDs in salmonella_serotype_taxids.txt"
 sed -i 's/Salmonella enterica subsp. enterica serovar //g' salmonella_serotype_taxids.txt
 } 
@@ -66,6 +75,5 @@ for SPECIES in "${SPECIES_LIST[@]}"; do
 download_genomes "$SPECIES" 
 done
 done
-#download_genomes "Salmonella bongori"
-#get_salmonella_serotype_taxid
+get_salmonella_serotype_taxid
 download_salmonella_serotype
