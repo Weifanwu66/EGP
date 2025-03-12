@@ -1,4 +1,4 @@
-# Salmonella_Gene_Summary_Pipeline
+# Enterobacteriaceae_Gene_Summary_Pipeline
 
 ## Overview
 This pipeline identifies the presence of a target gene across different *Salmonella enterica* serotypes using whole-genome sequencing data. It retrieves genome sequences from NCBI, processes them, and determines gene presence using alignment tools.
