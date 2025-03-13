@@ -9,8 +9,11 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
   - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
   - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool.
   - The number of iterations is determined by the total draft genomes (contigs) available in GenBank divided by the sample size, with a cap of 50 iterations to ensure computational feasibility.
-- **Fetches and processes raw sequencing data**
-- 📂 database/
+**Genome Organization & Processing**
+- Creates structured directories per genus, species, and serotype.
+- Maintains an aggregated directory for each genus and *Salmonella enterica*.
+- Constructs BLAST nucleotide databases for genus, species, and serotypes within Enterobacteriaceae.
+📂 database/
  ├── 📂 Enterobacteriaceae/
  │   ├── 📂 Escherichia/
  │   │   ├── 📂 Escherichia_coli/
