@@ -15,9 +15,9 @@ return
 fi
 mkdir -p "$genus_dir"
 echo "Downloading genus: $genus"
-ncbi-genome-download bacteria --genera "$genus" --assembly-level "$ASSEMBLY_LEVEL" --output-folder "$genus_dir" --verbose
-find "$genus_dir/refseq" -type f -name "*.gz" -exec sh -c 'gzip -d {} && mv ${0%.*} "$genus_dir"' {} \;
-rm -rf "$genus_dir/refseq"
+ncbi-genome-download bacteria --genera "$genus" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$genus_dir" --verbose
+find "$genus_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$0" && mv "${0%.gz}" "'"$genus_dir"'"' {} \;
+rm -rf "$genus_dir/genbank"
 echo "Downloaded and organized genomes for $genus"
 }
 # Build a function to get all species taxid
@@ -40,12 +40,12 @@ echo "Genomes already exist for $species, skipping donwloading"
 continue
 fi
 echo "Downloading genomes for $species"
-ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level "$ASSEMBLY_LEVEL" --output-folder "$species_dir"
+ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$species_dir"
 # Move genomic FASTA files to correct location
-find "$species_dir/refseq" -type f -name "*.gz" -exec sh -c 'gzip -d {} && mv ${0%.*} "$species_dir"' {} \;
-rm -rf "$species_dir/refseq"
+find "$species_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$0" && mv "${0%.gz}" "'"$species_dir"'"' {} \;
+rm -rf "$species_dir/genbank"
 done < "$GENOME_DIR/species_taxids.txt"
-find "$species_dir" -type d -empty -delete
+find "${GENOME_DIR}/$genus" -type d -empty -delete
 echo "Downloaded and organized genomes for $species"
 }
 get_salmonella_serotype_taxid() {
@@ -64,10 +64,10 @@ if [[ -n "$(find "$serotype_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/de
 echo "Genomes already exist for Salmonella enterica $serotype, skipping."
 continue
 fi
-ncbi-genome-download bacteria --taxid "$taxid" --assembly-level "$ASSEMBLY_LEVEL" --output-folder "$serotype_dir"
-find "$serotype_dir/refseq" -type f -name "*.gz" -exec sh -c 'gzip -d {} && mv ${0%.*} "$serotype_dir"' {} \;
-rm -rf "$serotype_dir/refseq"
-find "$serotype_dir" -type d -empty -delete
+ncbi-genome-download bacteria --taxid "$taxid" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$serotype_dir"
+find "$serotype_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$0" && mv "${0%.gz}" "'"$serotype_dir"'"' {} \;
+rm -rf "$serotype_dir/genbank"
+find "${GENOME_DIR}/Salmonella/Salmonella_enterica" -type d -empty -delete
 echo "Downloaded genomes for Salmonella $serotype"
 done < "$GENOME_DIR/salmonella_serotype_taxids.txt"
 }
