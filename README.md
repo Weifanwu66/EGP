@@ -1,11 +1,40 @@
-# Gene Prevalence Estimation Tool
+# Gene Prevalence Estimation Tool for Enterobacteriaceae
 
 ## Overview
-This pipeline identifies the presence of a target gene across different *Salmonella enterica* serotypes using whole-genome sequencing data. It retrieves genome sequences from NCBI, processes them, and determines gene presence using alignment tools.
+This tool is designed for estimating the prevalence of a specific gene in Enterobacteriaceae taxa, integrating NCBI genome retrieval, BLAST database construction, and automated query analysis.
 
 ## Features
-- **Fetches complete genome assemblies** for important *Salmonella enterica* serotypes using **NCBI Datasets** and **Entrez Direct**.
-- **Fetches and processes raw sequencing data** with **SRA Toolkit, Trimmomatic, and SKESA** and **evaluates assemblies quality** with **SeqKit**.
+**Genomic Data Acquisition**
+  - A pre-built BLAST database has been constructed for complete genomes. To ensure reproducibility, a metadata file listing all genomes used in the BLAST database is also provided. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable heavy mode to include draft genomes in their analysis.
+  - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
+  - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool.
+  - The number of iterations is determined by the total draft genomes (contigs) available in GenBank divided by the sample size, with a cap of 50 iterations to ensure computational feasibility.
+- **Fetches and processes raw sequencing data**
+- 📂 database/
+ ├── 📂 Enterobacteriaceae/
+ │   ├── 📂 Escherichia/
+ │   │   ├── 📂 Escherichia_coli/
+ │   │   ├── 📂 Escherichia_fergusonii/
+ │   │   └── ...
+ │   ├── 📂 Salmonella/
+ │   │   ├── 📂 Salmonella_enterica/
+ │   │   │   ├── 📂 aggregated/
+ │   │   │   ├── 📂 Typhimurium/
+ │   │   │   ├── 📂 Infantis/
+ │   │   │   ├── 📂 Newport/
+ │   │   │   ├── 📂 Heidelberg/
+ │   │   │   └── ... (various serotypes)
+ │   │   ├── 📂 Salmonella_bongori/
+ │   │   └── ...
+ │   ├── 📂 Shigella/
+ │   │   ├── 📂 Shigella_flexneri/
+ │   │   ├── 📂 Shigella_sonnei/
+ │   │   └── ...
+ │   ├── 📂 Klebsiella/
+ │   ├── 📂 Enterobacter/
+ │   ├── 📂 Citrobacter/
+ │   ├── 📂 Cronobacter/
+ │   └── ...
 - **Perform gene detection** using **BLAST+**.
 - Supports both **Heavy-weight and Light-weight Modes**:
   - Light-weight Mode: Uses only pre-exisiting complete genomes retrieved from NCBI database for analysis.
