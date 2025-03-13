@@ -13,36 +13,58 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 - Creates structured directories per genus, species, and serotype.
 - Maintains an aggregated directory for each genus and *Salmonella enterica*.
 - Constructs BLAST nucleotide databases for genus, species, and serotypes within Enterobacteriaceae.
-📂 database/
- ├── 📂 Enterobacteriaceae/
- │   ├── 📂 Escherichia/
- │   │   ├── 📂 Escherichia_coli/
- │   │   ├── 📂 Escherichia_fergusonii/
- │   │   └── ...
- │   ├── 📂 Salmonella/
- │   │   ├── 📂 Salmonella_enterica/
- │   │   │   ├── 📂 aggregated/
- │   │   │   ├── 📂 Typhimurium/
- │   │   │   ├── 📂 Infantis/
- │   │   │   ├── 📂 Newport/
- │   │   │   ├── 📂 Heidelberg/
- │   │   │   └── ... (various serotypes)
- │   │   ├── 📂 Salmonella_bongori/
- │   │   └── ...
- │   ├── 📂 Shigella/
- │   │   ├── 📂 Shigella_flexneri/
- │   │   ├── 📂 Shigella_sonnei/
- │   │   └── ...
- │   ├── 📂 Klebsiella/
- │   ├── 📂 Enterobacter/
- │   ├── 📂 Citrobacter/
- │   ├── 📂 Cronobacter/
- │   └── ...
-- **Perform gene detection** using **BLAST+**.
-- Supports both **Heavy-weight and Light-weight Modes**:
-  - Light-weight Mode: Uses only pre-exisiting complete genomes retrieved from NCBI database for analysis.
-  - Heavy-weight Mode: While still analyzing complete genomes, if a serotype has fewer than 30 complete genomes, the pipeline will automatically retrieve SRA data, assemble the raw sequences, and assess the quality of assemblies.
-- Output results in csv format, including serotype-level gene prevalence.
+- complete genomes structure:
+```
+complete_genomes
+│   ├── Escherichia/
+│   │   ├── aggregated/
+│   │   ├── Escherichia_coli/
+│   │   ├── Escherichia_fergusonii/
+│   │   ├── Escherichia_albertii/
+│   │   ├── ...
+│   ├── Salmonella/
+│   │   ├── aggregated/
+│   │   ├── Salmonella_enterica/
+│   │   │   ├── aggregated/
+│   │   │   ├── Typhimurium/
+│   │   │   ├── Infantis/
+│   │   │   ├── Newport/
+│   │   │   ├── Heidelberg/
+│   │   │   ├── ...
+│   │   ├── Salmonella_bongori/
+│   │   ├── Salmonella_subterrestris/
+│   │   ├── ...
+│   ├── Shigella/
+│   │   ├── aggregated/
+│   │   ├── Shigella_flexneri/
+│   │   ├── Shigella_sonnei/
+│   │   ├── Shigella_boydii/
+│   │   ├── ...
+│   ├── Klebsiella/
+│   │   ├── aggregated/
+│   │   ├── Klebsiella_pneumoniae/
+│   │   ├── Klebsiella_oxytoca/
+│   │   ├── ...
+│   ├── Enterobacter/
+│   │   ├── aggregated/
+│   │   ├── Enterobacter_cloacae/
+│   │   ├── Enterobacter_hormaechei/
+│   │   ├── ...
+│   ├── Citrobacter/
+│   │   ├── aggregated/
+│   │   ├── Citrobacter_freundii/
+│   │   ├── Citrobacter_koseri/
+│   │   ├── ...
+│   ├── Cronobacter/
+│   │   ├── aggregated/
+│   │   ├── Cronobacter_sakazakii/
+│   │   ├── Cronobacter_malonaticus/
+│   │   ├── ...
+```
+**BLAST Query & Analysis**
+- Performs BLAST searches against built databases.
+- Filters results by user-defined minimum identity & coverage thresholds.
+- 
 ------
 ## Installation
 To run this pipeline, set up a Conda environment with the required dependencies.
