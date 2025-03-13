@@ -1,16 +1,71 @@
-# Salmonella_Gene_Summary_Pipeline
+# Gene Prevalence Estimation Tool for Enterobacteriaceae
 
 ## Overview
-This pipeline identifies the presence of a target gene across different *Salmonella enterica* serotypes using whole-genome sequencing data. It retrieves genome sequences from NCBI, processes them, and determines gene presence using alignment tools.
+This tool is designed for estimating the prevalence of a specific gene in Enterobacteriaceae taxa, integrating NCBI genome retrieval, BLAST database construction, and automated query analysis.
 
 ## Features
-- **Fetches complete genome assemblies** for important *Salmonella enterica* serotypes using **NCBI Datasets** and **Entrez Direct**.
-- **Fetches and processes raw sequencing data** with **SRA Toolkit, Trimmomatic, and SKESA** and **evaluates assemblies quality** with **SeqKit**.
-- **Perform gene detection** using **BLAST+**.
-- Supports both **Heavy-weight and Light-weight Modes**:
-  - Light-weight Mode: Uses only pre-exisiting complete genomes retrieved from NCBI database for analysis.
-  - Heavy-weight Mode: While still analyzing complete genomes, if a serotype has fewer than 30 complete genomes, the pipeline will automatically retrieve SRA data, assemble the raw sequences, and assess the quality of assemblies.
-- Output results in csv format, including serotype-level gene prevalence.
+**Genomic Data Acquisition**
+  - A pre-built BLAST database has been constructed for complete genomes. To ensure reproducibility, a metadata file listing all genomes used in the BLAST database is also provided. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
+  - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
+  - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
+  - The number of iterations is determined by the total draft genomes (contigs) available in GenBank divided by the sample size, with a cap of 50 iterations to ensure computational feasibility.
+**Genome files Organization**
+- Creates structured directories per genus, species, and serotype.
+- Maintains an aggregated directory for each genus and *Salmonella enterica*.
+- Draft genomes are downloaded randomly in iterations and stored separately within the draft genome directory.
+- The script to download complete genomes is download_complete_genomes.sh and the script to build the BLAST database is makeblastdb.sh.
+```
+complete_genomes
+│   ├── Escherichia/
+│   │   ├── aggregated/
+│   │   ├── Escherichia_coli/
+│   │   ├── Escherichia_fergusonii/
+│   │   ├── Escherichia_albertii/
+│   │   ├── ...
+│   ├── Salmonella/
+│   │   ├── aggregated/
+│   │   ├── Salmonella_enterica/
+│   │   │   ├── aggregated/
+│   │   │   ├── Typhimurium/
+│   │   │   ├── Infantis/
+│   │   │   ├── Newport/
+│   │   │   ├── Heidelberg/
+│   │   │   ├── ...
+│   │   ├── Salmonella_bongori/
+│   ├── Shigella/
+│   │   ├── aggregated/
+│   │   ├── Shigella_flexneri/
+│   │   ├── Shigella_sonnei/
+│   │   ├── Shigella_boydii/
+│   │   ├── ...
+│   ├── Klebsiella/
+│   │   ├── aggregated/
+│   │   ├── Klebsiella_pneumoniae/
+│   │   ├── Klebsiella_oxytoca/
+│   │   ├── ...
+│   ├── Enterobacter/
+│   │   ├── aggregated/
+│   │   ├── Enterobacter_cloacae/
+│   │   ├── Enterobacter_hormaechei/
+│   │   ├── ...
+│   ├── Citrobacter/
+│   │   ├── aggregated/
+│   │   ├── Citrobacter_freundii/
+│   │   ├── Citrobacter_koseri/
+│   │   ├── ...
+│   ├── Cronobacter/
+│   │   ├── aggregated/
+│   │   ├── Cronobacter_sakazakii/
+│   │   ├── Cronobacter_malonaticus/
+│   │   ├── ...
+```
+**BLAST Query & Analysis**
+- BLAST analysis is conducted in two stages: First, against pre-built complete genome databases to leverage high-quality genome assemblies. Then, against draft genome databases, which are iteratively constructed during runtime to ensure representative sampling for each genus, species, and *Salmonella enterica* serotypes group.
+- Query gene file is provided by users (supports batch processing of multiple genes).
+- Filters results by user-defined minimum identity & coverage thresholds.
+**Gene prevalence calculation**
+- The prevalence of the gene is calculated based on hits in complete genomes only.
+- Draft genomes may have variable quality, by incorporating multiple iterations, and the final prevalence estimate is averaged over all iterations, ensuring robustness against sampling bias.
 ------
 ## Installation
 To run this pipeline, set up a Conda environment with the required dependencies.
@@ -36,12 +91,7 @@ conda install -c bioconda <package_name>
 -----
 ## Dependencies
 1. NCBI Datasets: https://github.com/ncbi/datasets
-2. Entrez Direct: https://www.ncbi.nlm.nih.gov/books/NBK179288/
 3. NCBI BLAST: https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html
-4. SRA Toolkit: https://github.com/ncbi/sra-tools/wiki
-5. Trimmomatic: https://github.com/usadellab/Trimmomatic/releases
-6. SKESA: https://github.com/ncbi/SKESA
-7. seqkit:https://github.com/shenwei356/seqkit/releases
 -----
 ## Flags and Options
 The pipeline provides several flgas to customize execution:
@@ -56,9 +106,9 @@ Usage: SGP.sh -g GENE_FILE -s SEROTYPE_FILE [--mode light|heavy] [--sra on|off] 
 -i IDENTITY : The minimum percentage of identity (default: 90%).
 -o OUTPUT_FILE : Output result file (default: gene_summary.tsv).
 ```
-Example usage:
+## Example usage:
 ```sh
-bash SGP.sh -g target_genes.fasta -s serotype_list.txt --mode heavy --sra on --sra_number 80 -c 95 -i 95 -o output.csv
+bash SGP.sh -g target_genes.fasta -t serotype_list.txt --mode heavy -c 95 -i 95 -o output.csv
 ```
 
 ## Output
