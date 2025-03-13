@@ -1,7 +1,7 @@
 #!/bin/bash
 WORK_DIR=$(pwd)
-GENOME_DIR="$WORK_DIR/database/EB_complete_genomes"
-BLAST_DB_DIR="$WORK_DIR/database/EB_blast_db"
+GENOME_DIR="$WORK_DIR/database/complete_genomes"
+BLAST_DB_DIR="$WORK_DIR/database/complete_blast_db"
 mkdir -p "${BLAST_DB_DIR}"
 EB_GENUS=("Escherichia" "Salmonella" "Shigella" "Klebsiella" "Enterobacter" "Cronobacter" "Citrobacter")
 create_blastdb() {
@@ -23,9 +23,9 @@ for SPECIES in $SPECIES_LIST; do
 SPECIES_DIR="${GENOME_DIR}/${GENUS}/${SPECIES}"
 if [[ "$SPECIES" == "Salmonella_enterica" ]]; then
 AGGREGATED_FASTA="${SPECIES_DIR}/aggregated/Salmonella_enterica_all_genomes.fna"
-find "$SPECIES_DIR}/aggregated" -type f -name "*_genomic.fna" -exec cat {} + > "$AGGREGATED_FASTA"
+find "${SPECIES_DIR}/aggregated" -type f -name "*_genomic.fna" -exec cat {} + > "$AGGREGATED_FASTA"
 create_blastdb "$AGGREGATED_FASTA" "Salmonella_enterica"
-for SEROTYPE_DIR in ${SPECIES_DIR}/*/; do
+for SEROTYPE_DIR in "${SPECIES_DIR}"/*/; do
 SEROTYPE=$(basename "$SEROTYPE_DIR")
 if [[ "$SEROTYPE" != "aggregated" ]]; then
 SEROTYPE_FASTA="$SEROTYPE_DIR/${SEROTYPE}_genomes.fna"
