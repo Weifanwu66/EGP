@@ -1,8 +1,4 @@
 #!/bin/bash
-function clean_taxons() {
-echo "$1" | sed 's| |_|g; s|\.|_|g; s|-|_|g; s|,||g; s|\[||g; s|\]||g; s|/|_|g'
-}
-
 function extract_taxon_levels_from_directory() {
 local name="$1"
 local genus=""
@@ -24,7 +20,13 @@ echo "$genus" "$species" "$serotype"
 
 function  get_salmonella_serotype_taxid() {
 local serotype="$1"
-local taxid=$(awk -v s="$serotype" -F'\t' '$2 == s {print $1}' "$(pwd)/database/salmonella_serotype_taxids.txt")
+local taxid=$(awk -v s="$serotype" -F'\t' '$2 == s {print $1}' "$(pwd)/database/complete_genomes/salmonella_serotype_taxids.txt")
+echo "$taxid"
+}
+
+function  get_species_taxid() {
+local species="$1"
+local taxid=$(awk -v s="$species" -F'\t' '$3 == s {print $1}' "$(pwd)/database/complete_genomes/species_taxids.txt")
 echo "$taxid"
 }
 
@@ -32,20 +34,18 @@ function get_total_genomes_count() {
 local genus="$1"
 local species_or_serotype="$2"
 local assembly_level="$3"
-if [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ : ]]; then
-taxid=$(get_salmonella_serotype_taxid "$species_or_serotype")
+if [[ -z "$species_or_serotype" ]]; then
+total_genomes=$(( $(ncbi-genome-download bacteria --genera "$genus" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
+elif [[ "$species_or_serotype" =~ [a-z] ]]; then
+local taxid=$(get_species_taxid "$species_or_serotype")
+elif [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ ":" ]]; then
+local taxid=$(get_salmonella_serotype_taxid "$species_or_serotype")
+fi
+local total_genomes=0
 for TAXID in $taxid; do
-COUNT=$(datasets summary genome taxon "$TAXID" --assembly-level "$assembly_level" 2>/dev/null | jq -r '.total_count')
+COUNT=$(( $(ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) -1 ))
 total_genomes=$((total_genomes + COUNT))
 done
-else
-if [[ -z "$species_or_serotype" ]]; then
-taxon="$genus"
-else
-taxon="$genus $species_or_serotype"
-fi
-total_genomes=$(datasets summary genome taxon "$taxon" --assembly-level "$assembly_level" 2>/dev/null | jq -r '.total_count')
-fi
 echo "$total_genomes"
 }
 
@@ -55,25 +55,21 @@ local species_or_serotype="$2"
 local sample_size="$3"
 local output_dir="$4"
 local iteration="$5"
-local taxon
-if [[ -z "$species_or_serotype" ]]; then
-taxon="$genus"
-else
-taxon="${genus}_${species_or_serotype}"
-fi
+local clean_species_or_serotype=$(echo "$species_or_serotype" | sed 's/ /_/g')
+local taxon="$genus"
+[[ -n "$species_or_serotype" ]] && taxon+="_$clean_species_or_serotype"
 local iteration_dir="${output_dir}/${taxon}/genomes_${iteration}"
 mkdir -p "$iteration_dir"
-local total_genomes
-total_genomes=$(get_total_genomes_count "$genus $species_or_serotype" "draft")
+local total_genomes=$(get_total_genomes_count "$genus" "$species_or_serotype" "contig")
 [[ "$sample_size" -gt "$total_genomes" ]] && sample_size="$total_genomes"
-local accessions
-if [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ : ]]; then
+if [[ -z "$species_or_serotype" ]]; then
+local accessions=$(ncbi-genome-download bacteria --genera "$genus" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}' | shuf -n "$sample_size" | awk '{print $1}')
+elif [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ : ]]; then
 local taxids=$(get_salmonella_serotype_taxid "$species_or_serotype")
-accessions=$(for TAXID in $taxids; do datasets summary genome taxon "$TAXID" --assembly-level contig | jq -r '.reports[].accession' done | shuf -n "$sample_size")
-else
-local taxon_query="$genus${species_or_serotype:+ $species_or_serotype}"
-accessions=$(datasets summary genome taxon "$taxon_query" --assembly-level contig | jq -r '.reports[].accession' | shuf -n "$sample_size")
+elif [[ "$species_or_serotype" =~ [a-z] ]]; then
+local taxids=$(get_species_taxid "$species_or_serotype")
 fi
+local accessions=$(for TAXID in $taxid; do ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}'; done | shuf -n "$sample_size" | awk '{print $1}')
 echo "$accessions" > "${iteration_dir}/selected_accessions.txt"
 datasets download genome accession --inputfile "${iteration_dir}/selected_accessions.txt" --filename "${iteration_dir}/download.zip"
 unzip -q -o "${iteration_dir}/download.zip" -d "${iteration_dir}"
