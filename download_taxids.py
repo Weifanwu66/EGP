@@ -10,7 +10,7 @@ with open(input_file, "r") as f:
     serotypes = [line.strip() for line in f if line.strip()]
 
 # Always prepend "Salmonella enterica subsp. enterica "
-species_names = [f"Salmonella enterica subsp. enterica {serotype}" for serotype in serotypes]
+species_names = [f"Salmonella enterica subsp. enterica serovar {serotype}" for serotype in serotypes]
 
 # Get taxonomic IDs
 taxid_mapping = ncbi.get_name_translator(species_names)
@@ -18,7 +18,7 @@ taxid_mapping = ncbi.get_name_translator(species_names)
 # Save results
 with open(output_file, "w") as f:
     for species, taxids in taxid_mapping.items():
-        serotype_name = species.replace("Salmonella enterica subsp. enterica ", "")
+        serotype_name = species.replace("Salmonella enterica subsp. enterica serovar ", "")
         f.write(f"{taxids[0]}\t{serotype_name}\n")
         print(f"{species}: {taxids[0]}")
 
