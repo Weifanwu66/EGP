@@ -20,14 +20,11 @@ echo "$genus" "$species" "$serotype"
 
 function  get_salmonella_serotype_taxid() {
 local serotype="$1"
-local taxid=$(awk -v s="$serotype" -F'\t' '$2 == s {print $1}' "$(pwd)/database/complete_genomes/salmonella_serotype_taxids.txt")
-echo "$taxid"
-}
-
-function  get_species_taxid() {
-local species="$1"
-local taxid=$(awk -v s="$species" -F'\t' '$3 == s {print $1}' "$(pwd)/database/complete_genomes/species_taxids.txt")
-echo "$taxid"
+if [[ "$serotype" == "monophasic Typhimurium" ]]; then
+echo "$(pwd)/database/complete_genomes/all_monophasic_Typhimurium_taxids.txt"
+else
+awk -v s="$serotype" -F'\t' '$2 == s {print $1}' "$(pwd)/database/complete_genomes/salmonella_serotype_taxids.txt")
+fi
 }
 
 function get_total_genomes_count() {
@@ -37,15 +34,15 @@ local assembly_level="$3"
 if [[ -z "$species_or_serotype" ]]; then
 total_genomes=$(( $(ncbi-genome-download bacteria --genera "$genus" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
 elif [[ "$species_or_serotype" =~ [a-z] ]]; then
-local taxid=$(get_species_taxid "$species_or_serotype")
+total_genomes=$(( $(ncbi-genome-download bacteria --genera "$genus $species_or_serotype" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
 elif [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ ":" ]]; then
 local taxid=$(get_salmonella_serotype_taxid "$species_or_serotype")
-fi
 local total_genomes=0
 for TAXID in $taxid; do
-COUNT=$(( $(ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) -1 ))
+local COUNT=$(( $(ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
 total_genomes=$((total_genomes + COUNT))
 done
+fi
 echo "$total_genomes"
 }
 
@@ -66,10 +63,10 @@ if [[ -z "$species_or_serotype" ]]; then
 local accessions=$(ncbi-genome-download bacteria --genera "$genus" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}' | shuf -n "$sample_size" | awk '{print $1}')
 elif [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ : ]]; then
 local taxids=$(get_salmonella_serotype_taxid "$species_or_serotype")
+local accessions=$(for TAXID in $taxids; do ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}'; done | shuf -n "$sample_size" | awk '{print $1}')
 elif [[ "$species_or_serotype" =~ [a-z] ]]; then
-local taxids=$(get_species_taxid "$species_or_serotype")
+local accessions=$(ncbi-genome-download bacteria --genera "$genus $species_or_serotype" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}' | shuf -n "$sample_size" | awk '{print $1}')
 fi
-local accessions=$(for TAXID in $taxid; do ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}'; done | shuf -n "$sample_size" | awk '{print $1}')
 echo "$accessions" > "${iteration_dir}/selected_accessions.txt"
 datasets download genome accession --inputfile "${iteration_dir}/selected_accessions.txt" --filename "${iteration_dir}/download.zip"
 unzip -q -o "${iteration_dir}/download.zip" -d "${iteration_dir}"
