@@ -61,7 +61,7 @@ exit 1
 fi
 # Output directory setup
 mkdir -p "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR"
-source "${WORK_DIR}/function.sh"
+source "${WORK_DIR}/function.sh" || { echo "Error sourcing function.sh". exit 1; }
 # Set delimiter as a space
 if [[ -n "$TAXON_FILE" ]]; then
 DELIMITER=" "
@@ -84,11 +84,14 @@ rm "${TAXON_FILE}_processed"
 fi
 # start with core processing functions
 process_complete_genomes() {
+local genus="$1"
+local species_or_serotype="$2"
+echo "Processing complete genomes for $genus $species_or_serotype"
 perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$BLAST_RESULT_DIR" "" "$TAXON_FILE"
 for blast_result_file in "${BLAST_RESULT_DIR}"/*_complete_blast_results.txt; do
 filter_blast_results "$blast_result_file" "$FILTERED_BLAST_RESULT_DIR" "$MIN_COVERAGE" "complete"
 done
-echo "Finished processing complete genomes"
+echo "Finished processing complete genomes for $genus $species_or_serotype"
 }
 
 process_draft_genomes() {
@@ -111,17 +114,19 @@ filter_blast_results "${blast_result_file}" "$FILTERED_DRAFT_BLAST_RESULT_DIR" "
 done
 }
 echo "Running in $MODE mode"
-process_complete_genomes
-# When heavy mode is on
-if [[ "$MODE" == "heavy" ]]; then
+if [[ -n "$TAXON_FILE" ]]; then
 while IFS="$DELIMITER" read -r genus species_or_serotype || [[ -n "$genus" ]]; do
+# When heavy mode is on
 [[ -z "$genus" ]] && continue
 genus=$(echo "$genus" | xargs)
 species_or_serotype=$(echo "$species_or_serotype" | xargs)
-process_draft_genomes "$genus" "$species_or_serotype"
+process_complete_genomes "$genus" "$species_or_serotype"
+[[ "$MODE" == "heavy" ]] && process_draft_genomes "$genus" "$species_or_serotype"
 done < "$TAXON_FILE"
+else
+echo "No taxon file provided, processing all available complete genomes."
+process_complete_genomes
 fi
-
 # Set up the output file headers
 if [[ "$MODE" == "heavy" ]]; then
 echo -e "Genus,Species_or_Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Draft_genomes_sample_size,Number_of_iterations,Complete_genomes_with_target_genes,Draft_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_draft_genomes" > "$OUTPUT_FILE"
