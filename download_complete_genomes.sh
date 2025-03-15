@@ -22,15 +22,15 @@ rm -rf "$genus_dir/genbank"
 echo "Downloaded and organized genomes for $genus"
 }
 # Build a function to get all species taxid
-get_species_taxids() {
+get_species_list() {
 for GENUS in "${EB_GENUS[@]}"; do
-esearch -db taxonomy -query "${GENUS}[Subtree]" | efetch -format xml | xtract -pattern Taxon -element TaxId,ScientificName | awk 'NF == 3 && $2 ~ /^[A-Z][a-z]+$/ && $3 ~ /^[a-z]+$/ {print $1, $2, $3}' >> "$GENOME_DIR/species_taxids.txt"
+esearch -db taxonomy -query "${GENUS}[Subtree]" | efetch -format xml | xtract -pattern Taxon -element ScientificName | awk 'NF == 2 && $1 ~ /^[A-Z][a-z]+$/ && $2 ~ /^[a-z]+$/ {print $0}' >> "$GENOME_DIR/species_list.txt"
 done
-echo "Saved all species Taxon IDs in species_taxids.txt"
+echo "Saved all species Taxon IDs in species_list.txt"
 }
 # Build a function to download species-level genomes using ncbi-genome-download
-download_species_by_taxid() {
-while read -r TAXID SPECIES; do
+download_species() {
+while read -r SPECIES; do
 local genus=$(echo "$SPECIES" | awk '{print $1}')
 local clean_species=$(echo "$SPECIES" | sed 's/ /_/g')
 local species_dir="$GENOME_DIR/$genus/$clean_species"
@@ -41,17 +41,17 @@ echo "Genomes already exist for $SPECIES, skipping donwloading"
 continue
 fi
 echo "Downloading genomes for $SPECIES"
-ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$species_dir"
+ncbi-genome-download bacteria --genera "$SPECIES" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$species_dir" --verbose
 # Move genomic FASTA files to correct location
 if [[ -d "$species_dir/genbank" ]]; then
 find "$species_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$0" && mv "${0%.gz}" "'"$species_dir"'"' {} \;
 rm -rf "$species_dir/genbank"
 fi
-if [[ -z "$(find "$species_dir" -maxdepth 1 -type d -name "genbank" 2>/dev/null)" ]]; then
+if [[ -z "$(find "$species_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
 echo "No genomes found for $SPECIES. Remove empty directory."
 rm -rf "$species_dir"
 fi
-done < "$GENOME_DIR/species_taxids.txt"
+done < "$GENOME_DIR/species_list.txt"
 echo "Downloaded and organized genomes for $SPECIES"
 }
 get_salmonella_serotype_taxid() {
@@ -102,10 +102,10 @@ echo "Downloaded genomes for Salmonella monophasic Typhimurium."
 find "${GENOME_DIR}/Salmonella/Salmonella_enterica" -type d -empty -delete
 }
 # Download genomes 
-for GENUS in "${EB_GENUS[@]}"; do
-download_genus "$GENUS"
-done
-get_species_taxids
-download_species_by_taxid 
+#for GENUS in "${EB_GENUS[@]}"; do
+#download_genus "$GENUS"
+#done
+#get_species_list
+download_species 
 get_salmonella_serotype_taxid
-download_salmonella_serotype
+#download_salmonella_serotype
