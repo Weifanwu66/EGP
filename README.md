@@ -5,12 +5,12 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 
 ## Features
 **Genomic Data Acquisition**
-  - A pre-built BLAST database has been constructed for complete genomes. To ensure reproducibility, a metadata file listing all genomes used in the BLAST database is also provided. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
+  - A pre-built BLAST database has been constructed for complete genomes. To ensure reproducibility, a metadata file listing all assembly accessions of genomes used in the BLAST database is also provided. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
   - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
   - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
   - The number of iterations is determined by the total draft genomes (contigs) available in GenBank divided by the sample size, with a cap of 50 iterations to ensure computational feasibility.
 **Genome files Organization**
-- Creates structured directories per genus, species, and serotype.
+- Creates structured directories per genus, species, and Salmonella enterica subspecies enterica serotype.
 - Maintains an aggregated directory for each genus and *Salmonella enterica*.
 - Draft genomes are downloaded randomly in iterations and stored separately within the draft genome directory.
 - The script to download complete genomes is download_complete_genomes.sh and the script to build the BLAST database is makeblastdb.sh.
@@ -91,6 +91,7 @@ conda install -c bioconda <package_name>
 -----
 ## Dependencies
 1. NCBI Datasets: https://github.com/ncbi/datasets
+2. ncbi-genome-download: Blin, K. (2023). ncbi-genome-download (0.3.3). Zenodo. https://doi.org/10.5281/zenodo.8192486
 3. NCBI BLAST: https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html
 -----
 ## Flags and Options
