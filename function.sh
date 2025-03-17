@@ -1,71 +1,86 @@
 #!/bin/bash
-function extract_taxon_levels_from_directory() {
-local name="$1"
-local genus=""
-local species="NA"
-local serotype="NA"
-IFS="_" read -r -a parts <<< "$name"
-genus="${parts[0]}"
-local second_part="${name#*_}"
-if [[ -n "$second_part" ]]; then
-if [[ "$second_part" =~ [A-Z] || "$second_part" =~ ":" ]]; then
-species="enterica"
-serotype="$second_part"
+MONOPHASIC_TYPHIMURIUM_LIST="$(pwd)/database/complete_genomes/monophasic_Typhimurium_list.txt"
+function extract_taxon_info() {
+local input="$1"
+local taxon_name=""
+read -ra words <<< "$input"
+if [[ "${words[1]}" == "monophasic" ]]; then
+taxon_name="Salmonella enterica subsp. enterica serovar monophasic Typhimurium"
+elif [[ "${words[1]}" =~ ^[A-Z] || "${words[1]}" =~ ":" ]]; then
+taxon_name="Salmonella enterica subsp. enterica serovar ${words[1]}"
 else
-species="$second_part"
+taxon_name="$input"
 fi
-fi
-echo "$genus" "$species" "$serotype"
-}
-
-function  get_salmonella_serotype_taxid() {
-local serotype="$1"
-if [[ "$serotype" == "monophasic Typhimurium" ]]; then
-echo "$(pwd)/database/complete_genomes/all_monophasic_Typhimurium_taxids.txt"
-else
-awk -v s="$serotype" -F'\t' '$2 == s {print $1}' "$(pwd)/database/complete_genomes/salmonella_serotype_taxids.txt")
-fi
+echo "$taxon_name"
 }
 
 function get_total_genomes_count() {
-local genus="$1"
-local species_or_serotype="$2"
-local assembly_level="$3"
-if [[ -z "$species_or_serotype" ]]; then
-total_genomes=$(( $(ncbi-genome-download bacteria --genera "$genus" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
-elif [[ "$species_or_serotype" =~ [a-z] ]]; then
-total_genomes=$(( $(ncbi-genome-download bacteria --genera "$genus $species_or_serotype" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
-elif [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ ":" ]]; then
-local taxid=$(get_salmonella_serotype_taxid "$species_or_serotype")
+local input="$1"
+local assembly_level="$2"
 local total_genomes=0
-for TAXID in $taxid; do
-local COUNT=$(( $(ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
-total_genomes=$((total_genomes + COUNT))
-done
+local query="$(extract_taxon_info "$input")"
+if [[ "$query" == "Salmonella enterica subsp. enterica serovar monophasic Typhimurium" ]]; then
+while read -r actual_name; do
+count=$(( $(ncbi-genome-download bacteria --genera "Salmonella enterica subsp. enterica serovar $actual_name" --assembly-level "$assembly_level" --section genbank --dry-run  | wc -l) - 1 ))
+((total_genomes += count))
+done < "$MONOPHASIC_TYPHIMURIUM_LIST"
+else
+total_genomes=$(( $(ncbi-genome-download bacteria --genera "$query" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
 fi
 echo "$total_genomes"
 }
 
+function calculate_sample_size_and_iterations(){
+local total_genomes="$1"
+local max_iterations=20
+if [[ "$total_genomes" -eq 0 ]]; then
+echo "0 0"
+return
+fi
+if [[ "$total_genomes" -le 100 ]]; then
+echo "$total_genomes 1"
+return
+fi
+# Cochran's formula constants
+local Z=1.96
+local p=0.5
+local e=0.05
+local n0=$(echo "scale=6; ($Z^2 * $p * (1 - $p)) / ($e^2)" | bc -l)
+# Finite population correction (FPC)
+local sample_size=$(echo "scale=6; ($n0 * $total_genomes) / ($total_genomes + $n0 -1)" | bc -l)
+sample_size=$(echo "$sample_size" | awk '{printf "%.0f", $1}')
+# Compute number of iterations using square-root scaling
+if [[ "$sample_size" -gt 0 ]]; then
+local iterations=$(echo "scale=6; sqrt($total_genomes / (2 * $sample_size))" | bc -l)
+iterations=$(echo "$iterations" | awk '{printf "%.0f", $1}')
+else
+local iterations=1
+fi
+if [[ "$iterations" -lt 1 ]]; then
+iterations=1
+elif [[ "$iterations" -gt "$max_iterations" ]]; then
+iterations="$max_iterations"
+fi
+echo "$sample_size $iterations"
+}
+
 function download_random_draft_genomes() {
-local genus="$1"
-local species_or_serotype="$2"
-local sample_size="$3"
-local output_dir="$4"
-local iteration="$5"
-local clean_species_or_serotype=$(echo "$species_or_serotype" | sed 's/ /_/g')
-local taxon="$genus"
-[[ -n "$species_or_serotype" ]] && taxon+="_$clean_species_or_serotype"
-local iteration_dir="${output_dir}/${taxon}/genomes_${iteration}"
+local input="$1"
+local sample_size="$2"
+local output_dir="$3"
+local iteration="$4"
+local query="$(extract_taxon_info "$input")"
+local taxon_dir_name="${query// /_}"
+taxon_dir_name="${taxon_dir_name//./}"
+local iteration_dir="${output_dir}/${taxon_dir_name}/genomes_${iteration}"
 mkdir -p "$iteration_dir"
-local total_genomes=$(get_total_genomes_count "$genus" "$species_or_serotype" "contig")
-[[ "$sample_size" -gt "$total_genomes" ]] && sample_size="$total_genomes"
-if [[ -z "$species_or_serotype" ]]; then
-local accessions=$(ncbi-genome-download bacteria --genera "$genus" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}' | shuf -n "$sample_size" | awk '{print $1}')
-elif [[ "$species_or_serotype" =~ [A-Z] || "$species_or_serotype" =~ : ]]; then
-local taxids=$(get_salmonella_serotype_taxid "$species_or_serotype")
-local accessions=$(for TAXID in $taxids; do ncbi-genome-download bacteria --taxid "$TAXID" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}'; done | shuf -n "$sample_size" | awk '{print $1}')
-elif [[ "$species_or_serotype" =~ [a-z] ]]; then
-local accessions=$(ncbi-genome-download bacteria --genera "$genus $species_or_serotype" --assembly-level contig --section genbank --dry-run | awk -F '/' '{print $NF}' | shuf -n "$sample_size" | awk '{print $1}')
+local accessions=""
+if [[ "$query" == "Salmonella enterica subsp. enterica serovar monophasic Typhimurium" ]]; then
+while read -r actual_name; do
+accessions+=$(ncbi-genome-download bacteria --genera "Salmonella enterica subsp. enterica serovar $actual_name" --assembly-level contig --section genbank --dry-run | tail -n +2 | awk -F '/' '{print $NF}' | shuf -n "$sample_size" | awk '{print $1}')
+done < "$MONOPHASIC_TYPHIMURIUM_LIST"
+else
+accessions=$(ncbi-genome-download bacteria --genera "$query" --assembly-level contig --section genbank --dry-run | tail -n +2 | awk -F '/' '{print $NF}' | shuf -n "$sample_size" | awk '{print $1}')
 fi
 echo "$accessions" > "${iteration_dir}/selected_accessions.txt"
 datasets download genome accession --inputfile "${iteration_dir}/selected_accessions.txt" --filename "${iteration_dir}/download.zip"
@@ -96,13 +111,12 @@ mkdir -p "$(dirname "$blast_output")"
 blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity"
 echo "BLAST results saved to: $blast_output"
 else
-echo "Processing complete genomes"
 if [[ -n "$taxon_file" ]]; then
-while IFS="$DELIMITER" read -r genus species_or_serotype || [[ -n "$genus" ]]; do
+while read -r taxon || [[ -n "$taxon" ]]; do
 # Skip empty lines
-[[ -z "$genus" ]] && continue
-local blast_db_name="${genus}"
-[[ -n "$species_or_serotype" ]] && blast_db_name+="_${species_or_serotype// /_}"
+[[ -z "$taxon" ]] && continue
+local blast_db_name="${taxon// /_}"
+blast_db_name="${blast_db_name//./}"
 local blast_db="${BLAST_DB_DIR}/${blast_db_name}"
 local blast_output="${output_dir}/${blast_db_name}_complete_blast_results.txt"
 blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity"
@@ -111,11 +125,8 @@ done < "$taxon_file"
 else
 echo "No taxon file provided. Processing all pre-built BLAST database"
 find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed -E '/[._][0-9]{2}$/s/[._][0-9]{2}$//' | sort -u | while read -r line; do
-genus=$(echo "$line" | awk '{print $1}' | xargs)
-species_or_serotype=$(echo "$line" | awk '{$1=""; print $0}' | xargs)
-[[ "$genus" == "$line" ]] && species_or_serotype=""
-local blast_db_name="$genus"
-[[ -n "$species_or_serotype" ]] && blast_db_name+="_${species_or_serotype// /_}"
+local blast_db_name="${taxon// /_}"
+blast_db_name="${blast_db_name//./}"
 local blast_db="${BLAST_DB_DIR}/${blast_db_name}"
 local blast_output="${output_dir}/${blast_db_name}_complete_blast_results.txt"
 blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity"
