@@ -14,18 +14,15 @@ FILTERED_BLAST_RESULT_DIR="${WORK_DIR}/result/filtered_complete_blast_results"
 DRAFT_BLAST_DB_DIR="${WORK_DIR}/database/draft_blast_db"
 DRAFT_BLAST_RESULT_DIR="${WORK_DIR}/result/draft_blast_results"
 FILTERED_DRAFT_BLAST_RESULT_DIR="${WORK_DIR}/result/filtered_draft_blast_results"
-DRAFT_SAMPLE_SIZE=100
-MAX_ITERATIONS=50
 OVERWRITE=false
 # usage setup
 usage(){
-echo "Usage: $0 -g GENE_FILE [-t TAXON_FILE] [-c COVERAGE] [-i IDENTITY] [-o OUTPUT_FILE] [--draft-sample N] [--mode light|heavy]"
+echo "Usage: $0 -g GENE_FILE [-t TAXON] [-c COVERAGE] [-i IDENTITY] [-o OUTPUT_FILE] [--draft-sample N] [--mode light|heavy]"
 echo "-g GENE_FILE : FASTA file with target gene sequence (required)." 
-echo "-t TAXON_FILE : File containing your target taxons (one target per line); A taxon_file is always recommended and must be provided in heavy mode."
+echo "-t TAXON_FILE : File containing target taxons (one target per line) or a single taxon name (e.g., "Salmonella Typhimurium"); A taxon_file is always recommended and must be provided in heavy mode."
 echo "-c COVERAGE : The minimum genome coverage (default: 80%)." 
 echo "-i IDENTITY : The minimum percentage of identity (default: 90%)."
 echo "-o OUTPUT_FILE : Output result file (default: EB_gene_summary.tsv)."
-echo "--draft-sample N : Number of draft genomes to randomly select per iteration (default: 100)."
 echo "--mode light|heavy : Run in light mode (complete genomes only) or heavy mode (complete+draft genomes, default: light)."
 echo "--overwrite : If overwrite mode is enabled, previous results will be cleared (default: false)."
 }
@@ -37,7 +34,6 @@ case "$1" in
 -c) MIN_COVERAGE="$2"; shift ;;
 -i) MIN_IDENTITY="$2"; shift ;;
 -o) OUTPUT_FILE="$2"; shift ;;
---draft-sample) DRAFT_SAMPLE_SIZE="$2"; shift ;;
 --mode) MODE="$2"; shift ;;
 --overwrite) OVERWRITE=true ;;
 -h|--help) usage; exit 0 ;;
@@ -45,6 +41,12 @@ case "$1" in
 esac
 shift
 done 
+# Handle taxon input (file or direct name)
+if [[ -n "$TAXON_FILE" && ! -f "$TAXON_FILE" ]]; then
+tmp_taxon_file=$(mktemp)
+TAXON_FILE="$tmp_taxon_file"
+trap "rm -f -- '$tmp_taxon_file'" EXIT
+fi
 if [[ "$OVERWRITE" == true ]]; then
 rm -rf "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR" "$DRAFT_BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR" "$OUTPUT_FILE"
 fi
@@ -84,54 +86,50 @@ rm "${TAXON_FILE}_processed"
 fi
 # start with core processing functions
 process_complete_genomes() {
-local genus="$1"
-local species_or_serotype="$2"
-echo "Processing complete genomes for $genus $species_or_serotype"
-perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$BLAST_RESULT_DIR" "" "$TAXON_FILE"
-for blast_result_file in "${BLAST_RESULT_DIR}"/*_complete_blast_results.txt; do
+local taxon="$1"
+echo "Processing complete genomes for $taxon"
+perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$BLAST_RESULT_DIR" "" "$taxon"
+local blast_db_name="${taxon// /_}"
+blast_db_name="${blast_db_name//./}"
+for blast_result_file in "${BLAST_RESULT_DIR}/${blast_db_name}_complete_blast_results.txt"; do
 filter_blast_results "$blast_result_file" "$FILTERED_BLAST_RESULT_DIR" "$MIN_COVERAGE" "complete"
 done
-echo "Finished processing complete genomes for $genus $species_or_serotype"
+echo "Finished processing complete genomes for $taxon"
 }
 
 process_draft_genomes() {
-local genus="$1"
-local species_or_serotype="$2"
-echo "Processing draft genomes"
-local total_draft_genomes=$(get_total_genomes_count "$genus" "$species_or_serotype" "contig")
-local iterations=$(( total_draft_genomes / DRAFT_SAMPLE_SIZE ))
-(( iterations < 1 )) && iterations=1
-(( iterations > MAX_ITERATIONS )) && iterations=$MAX_ITERATIONS
-local taxon="${genus}"
-[[ -n "$species_or_serotype" ]] && taxon+="_${species_or_serotype}"
-echo "Processing $taxon | Total draft genomes: $total_draft_genomes. Running $iterations iterations (max 100) with sample size $DRAFT_SAMPLE_SIZE."
+local taxon="$1"
+local total_draft_genomes=$(get_total_genomes_count "$taxon" "contig")
+read -r sample_size iterations <<< "$(calculate_sample_size_and_iterations "$total_draft_genomes")"
+echo "Processing $taxon | Total draft genomes: $total_draft_genomes. Running $iterations iterations (max 20)."
 for ((i=1; i<=iterations; i++)); do
 echo "Starting iterations $i/$iterations for $taxon"
-download_random_draft_genomes "$genus" "$species_or_serotype" "$DRAFT_SAMPLE_SIZE" "$EB_DRAFT_GENOMES_DIR" "$i"
+download_random_draft_genomes "$taxon" "$sample_size" "$EB_DRAFT_GENOMES_DIR" "$i"
 perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$DRAFT_BLAST_RESULT_DIR" "$i" ""
-local blast_result_file="${DRAFT_BLAST_RESULT_DIR}/${taxon}/iteration${i}_draft_blast_results.txt"
-filter_blast_results "${blast_result_file}" "$FILTERED_DRAFT_BLAST_RESULT_DIR" "$MIN_COVERAGE" "draft"
+local blast_db_name="${taxon// /_}"
+blast_db_name="${blast_db_name//./}"
+local blast_result_file="${DRAFT_BLAST_RESULT_DIR}/${blast_db_name}/iteration${i}_draft_blast_results.txt"
+filter_blast_results "$blast_result_file" "$FILTERED_DRAFT_BLAST_RESULT_DIR" "$MIN_COVERAGE" "draft"
 done
 }
 echo "Running in $MODE mode"
 if [[ -n "$TAXON_FILE" ]]; then
-while IFS="$DELIMITER" read -r genus species_or_serotype || [[ -n "$genus" ]]; do
-# When heavy mode is on
-[[ -z "$genus" ]] && continue
-genus=$(echo "$genus" | xargs)
-species_or_serotype=$(echo "$species_or_serotype" | xargs)
-process_complete_genomes "$genus" "$species_or_serotype"
-[[ "$MODE" == "heavy" ]] && process_draft_genomes "$genus" "$species_or_serotype"
+while read -r taxon || [[ -n "$taxon" ]]; do
+[[ -z "$taxon" ]] && continue
+process_complete_genomes "$taxon"
+[[ "$MODE" == "heavy" ]] && process_draft_genomes "$taxon"
 done < "$TAXON_FILE"
 else
 echo "No taxon file provided, processing all available complete genomes."
-process_complete_genomes
+while read -r taxon; do
+process_complete_genomes "$taxon"
+done < <(find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed -E '/[._][0-9]{2}$/s/[._][0-9]{2}$//' | sort -u)
 fi
 # Set up the output file headers
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "Genus,Species_or_Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Draft_genomes_sample_size,Number_of_iterations,Complete_genomes_with_target_genes,Draft_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_draft_genomes" > "$OUTPUT_FILE"
+echo -e "Organism,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Draft_genomes_sample_size,Number_of_iterations,Complete_genomes_with_target_genes,Draft_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_draft_genomes" > "$OUTPUT_FILE"
 else
-echo -e "Genus,Species_or_Serotype,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Complete_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes" > "$OUTPUT_FILE"
+echo -e "Organism,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Complete_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes" > "$OUTPUT_FILE"
 fi
 # Ensure serotypes are loaded and process results for each serotype
 if [[ -z "$TAXON_FILE" ]]; then
@@ -141,21 +139,19 @@ TAXON_LIST=$(find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed 
 else
 TAXON_LIST=$(< "$TAXON_FILE")
 fi
-echo "$TAXON_LIST" | while IFS="$DELIMITER" read -r line || [[ -n "$line" ]]; do
-genus=$(echo "$line" | awk '{print $1}' | xargs)
-species_or_serotype=$(echo "$line" | awk '{$1=""; print $0}' | xargs)
-[[ "$genus" == "$line" ]] && species_or_serotype=""
-TOTAL_COMPLETE_GENOMES=$(get_total_genomes_count "$genus" "$species_or_serotype" "complete") 
-TOTAL_DRAFT_GENOMES=$(get_total_genomes_count "$genus" "$species_or_serotype" "contig")
-if [[ "$MODE" == "heavy" ]]; then
-ITERATIONS=$(( TOTAL_DRAFT_GENOMES / DRAFT_SAMPLE_SIZE ))
-(( ITERATIONS < 1 )) && ITERATIONS=1
-(( ITERATIONS > MAX_ITERATIONS )) && ITERATIONS=$MAX_ITERATIONS
+echo "$TAXON_LIST" | while read -r taxon || [[ -n "$taxon" ]]; do
+[[ -z "$taxon" ]] && continue
+local_taxon="${taxon// /_}"
+local_taxon="${local_taxon//./}"
+echo "Processing: $local_taxon"
+TOTAL_COMPLETE_GENOMES=$(get_total_genomes_count "$taxon" "complete") 
+TOTAL_DRAFT_GENOMES=$(get_total_genomes_count "$taxon" "contig")
+if [[ "$MODE" == "heavy" && "$TOTAL_DRAFT_GENOMES" -gt 0 ]]; then
+read -r DRAFT_SAMPLE_SIZE ITERATIONS <<< "$(calculate_sample_size_and_iterations "$TOTAL_DRAFT_GENOMES")"
 else
+DRAFT_SAMPLE_SIZE=0
 ITERATIONS=0
 fi
-local_taxon="$genus"
-[[ -n "$species_or_serotype" ]] && local_taxon+="_${species_or_serotype}"
 GENE_WITH_HITS=$(awk '{print $1}' "$FILTERED_BLAST_RESULT_DIR/filtered_${local_taxon}_complete_blast_results.txt" 2>/dev/null)
 [[ "$MODE" == "heavy" ]] && GENE_WITH_HITS+=$'\n'$(awk '{print $1}' "$FILTERED_DRAFT_BLAST_RESULT_DIR/$local_taxon"/* 2>/dev/null)
 GENE_WITH_HITS=$(echo "$GENE_WITH_HITS" | sort -u)
@@ -183,16 +179,16 @@ else
 PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES=0
 fi
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$DRAFT_SAMPLE_SIZE,$ITERATIONS,$COMPLETE_GENOMES_WITH_TARGET_GENES,$DRAFT_GENOMES_WITH_TARGET_GENES,${PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES}%,${PERCENT_WITH_TARGET_GENES_DRAFT_GENOMES}%" >> "$OUTPUT_FILE"
+echo -e "$taxon,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$DRAFT_SAMPLE_SIZE,$ITERATIONS,$COMPLETE_GENOMES_WITH_TARGET_GENES,$DRAFT_GENOMES_WITH_TARGET_GENES,${PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES}%,${PERCENT_WITH_TARGET_GENES_DRAFT_GENOMES}%" >> "$OUTPUT_FILE"
 else
-echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,${PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES}%"  >> "$OUTPUT_FILE"
+echo -e "$taxon,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$COMPLETE_GENOMES_WITH_TARGET_GENES,${PERCENT_WITH_TARGET_GENES_COMPLETE_GENOMES}%"  >> "$OUTPUT_FILE"
 fi
 else
 # If no hits were found for the gene in a serotype, output is recorded as 0%
 if [[ "$MODE" == "heavy" ]]; then
-echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$DRAFT_SAMPLE_SIZE,$ITERATIONS,0,0,0%,0%" >> "$OUTPUT_FILE"
+echo -e "$taxon,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,$DRAFT_SAMPLE_SIZE,$ITERATIONS,0,0,0%,0%" >> "$OUTPUT_FILE"
 else
-echo -e "$genus,$species_or_serotype,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,0,0%" >> "$OUTPUT_FILE"
+echo -e "$taxon,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL_COMPLETE_GENOMES,0,0%" >> "$OUTPUT_FILE"
 fi
 fi
 done

@@ -9,6 +9,7 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
   - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
   - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
   - The number of iterations is determined by the total draft genomes (contigs) available in GenBank divided by the sample size, with a cap of 50 iterations to ensure computational feasibility.
+
 **Genome files Organization**
 - Creates structured directories per genus, species, and Salmonella enterica subspecies enterica serotype.
 - Maintains an aggregated directory for each genus and *Salmonella enterica*.
@@ -63,6 +64,7 @@ complete_genomes
 - BLAST analysis is conducted in two stages: First, against pre-built complete genome databases to leverage high-quality genome assemblies. Then, against draft genome databases, which are iteratively constructed during runtime to ensure representative sampling for each genus, species, and *Salmonella enterica* serotypes group.
 - Query gene file is provided by users (supports batch processing of multiple genes).
 - Filters results by user-defined minimum identity & coverage thresholds.
+
 **Gene prevalence calculation**
 - The prevalence of the gene is calculated based on hits in complete genomes only.
 - Draft genomes may have variable quality, by incorporating multiple iterations, and the final prevalence estimate is averaged over all iterations, ensuring robustness against sampling bias.
