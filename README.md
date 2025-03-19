@@ -5,59 +5,71 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 
 ## Features
 **Genomic Data Acquisition**
-  - A pre-built BLAST database has been constructed for complete genomes. To ensure reproducibility, a metadata file listing all assembly accessions of genomes used in the BLAST database is also provided. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
+  - Due to the large storage requirements, genome sequence files will not be uploaded to this repository. Instead, metadata files containing all assembly accessions for the downloaded genomes are provided for each respective directory and stored in database/metadata. This ensures traceability and allows users to retrieve specific assemblies if needed.
+  - A pre-built BLAST database has been constructed for complete genomes. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
   - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
   - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
-  - The number of iterations is determined by the total draft genomes (contigs) available in GenBank divided by the sample size, with a cap of 50 iterations to ensure computational feasibility.
+  - The sample size and number of iterations are automatically calculated using Cochran’s formula and finite population correction, based on the total number of draft genomes (contigs) available in GenBank. To maintain computational feasibility, the number of iterations is capped at 20.
 
 **Genome files Organization**
-- Creates structured directories per genus, species, and Salmonella enterica subspecies enterica serotype.
-- Maintains an aggregated directory for each genus and *Salmonella enterica*.
+- Creates structured directories per genus, species, *Salmonella enterica* subspecies, and serotypes under *Salmonella enterica subsp. enterica*.
+- Maintains an unclassified directory for each taxon.
 - Draft genomes are downloaded randomly in iterations and stored separately within the draft genome directory.
-- The script to download complete genomes is download_complete_genomes.sh and the script to build the BLAST database is makeblastdb.sh.
+- The script to download complete genomes is download_complete_genomes.sh and the script to build the BLAST database is makeblastdb_complete_genomes.sh.
 ```
-complete_genomes
 │   ├── Escherichia/
-│   │   ├── aggregated/
+│   │   ├── unclassified/
 │   │   ├── Escherichia_coli/
 │   │   ├── Escherichia_fergusonii/
 │   │   ├── Escherichia_albertii/
 │   │   ├── ...
 │   ├── Salmonella/
-│   │   ├── aggregated/
+│   │   ├── unclassified/
 │   │   ├── Salmonella_enterica/
-│   │   │   ├── aggregated/
-│   │   │   ├── Typhimurium/
-│   │   │   ├── Infantis/
-│   │   │   ├── Newport/
-│   │   │   ├── Heidelberg/
-│   │   │   ├── ...
+│   │   │   ├── unclassified/
+│   │   │   ├── subsp_enterica/
+│   │   │   │   ├── unclassified/
+│   │   │   │   ├── Typhimurium/
+│   │   │   │   ├── Infantis/
+│   │   │   │   ├── Newport/
+│   │   │   │   ├── Heidelberg/
+│   │   │   │   ├── ...
+│   │   │   ├── subsp_salamae/
+│   │   │   ├── subsp_arizonae/
+│   │   │   ├── subsp_diarizonae/
+│   │   │   ├── subsp_houtenae/
+│   │   │   ├── subsp_indica/
 │   │   ├── Salmonella_bongori/
 │   ├── Shigella/
-│   │   ├── aggregated/
+│   │   ├── unclassified/
 │   │   ├── Shigella_flexneri/
 │   │   ├── Shigella_sonnei/
 │   │   ├── Shigella_boydii/
 │   │   ├── ...
 │   ├── Klebsiella/
-│   │   ├── aggregated/
+│   │   ├── unclassified/
 │   │   ├── Klebsiella_pneumoniae/
 │   │   ├── Klebsiella_oxytoca/
 │   │   ├── ...
 │   ├── Enterobacter/
-│   │   ├── aggregated/
+│   │   ├── unclassified/
 │   │   ├── Enterobacter_cloacae/
 │   │   ├── Enterobacter_hormaechei/
 │   │   ├── ...
 │   ├── Citrobacter/
-│   │   ├── aggregated/
+│   │   ├── unclassified/
 │   │   ├── Citrobacter_freundii/
 │   │   ├── Citrobacter_koseri/
 │   │   ├── ...
 │   ├── Cronobacter/
-│   │   ├── aggregated/
+│   │   ├── unclassified/
 │   │   ├── Cronobacter_sakazakii/
 │   │   ├── Cronobacter_malonaticus/
+│   │   ├── ...
+│   ├── Proteus/
+│   │   ├── complete_genomes/
+│   │   ├── Proteus_mirabilis/
+│   │   ├── Proteus_vulgaris/
 │   │   ├── ...
 ```
 **BLAST Query & Analysis**
