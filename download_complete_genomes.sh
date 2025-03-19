@@ -5,7 +5,7 @@ GENOME_DIR="$WORKDIR/database/complete_genomes"
 ASSEMBLY_LEVEL="complete"
 MONOPHASIC_TYPHIMURIUM_LIST="$GENOME_DIR/monophasic_Typhimurium_list.txt"
 # List of Enterobacteriaceae Genera
-EB_GENUS=("Escherichia" "Salmonella" "Shigella" "Klebsiella" "Enterobacter" "Cronobacter" "Citrobacter")
+GENUS=("Proteus" "Escherichia" "Salmonella" "Shigella" "Klebsiella" "Enterobacter" "Cronobacter" "Citrobacter")
 # Build a function to download genus-level genomes using ncbi-genome-download
 download_genus() {
 local genus="$1"
@@ -23,15 +23,21 @@ echo "Downloaded and organized genomes for $genus"
 }
 # Build a function to get all species names under each target genus
 get_species_list() {
-for GENUS in "${EB_GENUS[@]}"; do
-esearch -db taxonomy -query "${GENUS}[Subtree]" | efetch -format xml | xtract -pattern Taxon -element ScientificName | awk 'NF == 2 && $1 ~ /^[A-Z][a-z]+$/ && $2 ~ /^[a-z]+$/ {print $0}' >> "$GENOME_DIR/species_list.txt"
+local target_genus="$1"
+esearch -db taxonomy -query "${target_genus}[Subtree]" | efetch -format xml | xtract -pattern Taxon -element ScientificName | awk 'NF == 2 && $1 ~ /^[A-Z][a-z]+$/ && $2 ~ /^[a-z]+$/ {print $0}' | \
+while read -r SPECIES; do
+echo "$SPECIES" >> "$GENOME_DIR/species_list.txt"
 done
-echo "Saved all species Taxon IDs in species_list.txt"
+echo "Saved all species names of $target_genus in species_list.txt"
 }
 # Build a function to download species-level genomes using ncbi-genome-download
 download_species() {
+local target_genus="$1"
 while read -r SPECIES; do
 local genus=$(echo "$SPECIES" | awk '{print $1}')
+if [[ "$genus" != "$target_genus" ]]; then
+continue
+fi
 local clean_species=$(echo "$SPECIES" | sed 's/ /_/g')
 local species_dir="$GENOME_DIR/$genus/$clean_species"
 [[ "$SPECIES" == "Salmonella enterica" ]] && species_dir="$species_dir/aggregated"
@@ -52,7 +58,7 @@ echo "No genomes found for $SPECIES. Remove empty directory."
 rm -rf "$species_dir"
 fi
 done < "$GENOME_DIR/species_list.txt"
-echo "Downloaded and organized genomes for $SPECIES"
+echo "Downloaded and organized species genomes for $target_genus"
 }
 # Build a function to get all subspecies names under Salmonella enterica
 get_salmonella_subsp_list() {
@@ -149,11 +155,11 @@ echo "Organizing genomes into unclassified directories and removing aggregated d
 }
 
 # Download genomes 
-for GENUS in "${EB_GENUS[@]}"; do
+for GENUS in "${GENUS[@]}"; do
 download_genus "$GENUS"
+get_species_list "$GENUS"
+download_species "$GENUS" 
 done
-get_species_list
-download_species 
 get_salmonella_subsp_list
 download_salmonella_subsp
 get_salmonella_serotype_list

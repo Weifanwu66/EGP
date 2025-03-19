@@ -25,7 +25,8 @@ count=$(( $(ncbi-genome-download bacteria --genera "Salmonella enterica subsp. e
 ((total_genomes += count))
 done < "$MONOPHASIC_TYPHIMURIUM_LIST"
 else
-total_genomes=$(( $(ncbi-genome-download bacteria --genera "$query" --assembly-level "$assembly_level" --section genbank --dry-run | wc -l) - 1 ))
+total_genomes=$(( $(ncbi-genome-download bacteria --genera "$query" --assembly-level "$assembly_level" --section genbank --dry-run --verbose | wc -l) - 1 ))
+total_genomes=$(( total_genomes < 0 ? 0 : total_genomes ))
 fi
 echo "$total_genomes"
 }
@@ -108,31 +109,17 @@ cat "$genome_dir"/*_genomic.fna > "$concatenated_genome"
 makeblastdb -in "$concatenated_genome" -dbtype nucl -out "$blast_db"
 local blast_output="${output_dir}/${taxon}/iteration_${iteration}_draft_blast_results.txt"
 mkdir -p "$(dirname "$blast_output")"
-blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity"
+blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity" -max_target_seqs 7000
 echo "BLAST results saved to: $blast_output"
 else
-if [[ -n "$taxon_file" ]]; then
-while read -r taxon || [[ -n "$taxon" ]]; do
 # Skip empty lines
 [[ -z "$taxon" ]] && continue
 local blast_db_name="${taxon// /_}"
 blast_db_name="${blast_db_name//./}"
 local blast_db="${BLAST_DB_DIR}/${blast_db_name}"
 local blast_output="${output_dir}/${blast_db_name}_complete_blast_results.txt"
-blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity"
+blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity" -max_target_seqs 7000
 echo "BLAST results saved to $blast_output"
-done < "$taxon_file"
-else
-echo "No taxon file provided. Processing all pre-built BLAST database"
-find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed -E '/[._][0-9]{2}$/s/[._][0-9]{2}$//' | sort -u | while read -r line; do
-local blast_db_name="${taxon// /_}"
-blast_db_name="${blast_db_name//./}"
-local blast_db="${BLAST_DB_DIR}/${blast_db_name}"
-local blast_output="${output_dir}/${blast_db_name}_complete_blast_results.txt"
-blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity"
-echo "BLAST results saved to $blast_output"
-done
-fi
 fi
 echo "BLAST analysis completed. Results saved in: $output_dir"
 }
