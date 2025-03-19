@@ -5,11 +5,10 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 
 ## Features
 **Genomic Data Acquisition**
-  - Due to the large storage requirements, genome sequence files will not be uploaded to this repository. Instead, metadata files containing all assembly accessions for the downloaded genomes are provided for each respective directory and stored in database/metadata. This ensures traceability and allows users to retrieve specific assemblies if needed.
+  - Due to the large storage requirements, genome sequence files used to build BLAST database will not be uploaded to this repository. Instead, metadata files containing all assembly accessions for the downloaded genomes are provided for each respective directory and stored in `database/metadata`. This ensures traceability and allows users to retrieve specific assemblies if needed.
   - A pre-built BLAST database has been constructed for complete genomes. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
-  - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
-  - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
-  - The sample size is automatically calculated using Cochran’s formula and finite population correction and and number of iterations are determined using square-root scaling, based on the total number of draft genomes (contigs) available in GenBank. To maintain computational feasibility, the number of iterations is capped at 20.
+  - For draft genomes, users must provide their target taxa. Draft genomes for each taxon are retrieved and randomly shuffled before selection based on their accessions. using ncbi-genome-download, then downloaded using the datasets tool. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
+  - The sample size per iteration is automatically calculated using Cochran’s formula and finite population correction and and number of iterations are determined using square-root scaling, based on the total number of draft genomes (contigs) available in GenBank. To maintain computational feasibility, the number of iterations is capped at 20.
 
 **Genome files Organization**
 - Creates structured directories per genus, species, *Salmonella enterica* subspecies, and serotypes under *Salmonella enterica subsp. enterica*.
