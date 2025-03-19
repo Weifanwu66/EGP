@@ -41,12 +41,6 @@ case "$1" in
 esac
 shift
 done 
-# Handle taxon input (file or direct name)
-if [[ -n "$TAXON_FILE" && ! -f "$TAXON_FILE" ]]; then
-tmp_taxon_file=$(mktemp)
-TAXON_FILE="$tmp_taxon_file"
-trap "rm -f -- '$tmp_taxon_file'" EXIT
-fi
 if [[ "$OVERWRITE" == true ]]; then
 rm -rf "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR" "$DRAFT_BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR" "$OUTPUT_FILE"
 fi
@@ -76,8 +70,8 @@ gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
 gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
 genus = $1
 species_or_serotype = ($2 != "") ? $2 : ""
-if (genus !~ /^(Salmonella|Escherichia|Citrobacter|Enterobacter|Klebsiella|Shigella|Cronobacter)$/) {
-print "Error: Invalid genus in taxon file. Allowed: Salmonella, Escherichia, Citrobacter, Enterobacter, Klebsiella, Shigella, Cronobacter."
+if (genus !~ /^(Proteus|Salmonella|Escherichia|Citrobacter|Enterobacter|Klebsiella|Shigella|Cronobacter)$/) {
+print "Error: Invalid genus in taxon file. Allowed: Proteus, Salmonella, Escherichia, Citrobacter, Enterobacter, Klebsiella, Shigella, Cronobacter."
 print "Your line:", $0
 exit 1 
 }
@@ -88,10 +82,16 @@ fi
 process_complete_genomes() {
 local taxon="$1"
 echo "Processing complete genomes for $taxon"
-perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$BLAST_RESULT_DIR" "" "$taxon"
 local blast_db_name="${taxon// /_}"
 blast_db_name="${blast_db_name//./}"
-for blast_result_file in "${BLAST_RESULT_DIR}/${blast_db_name}_complete_blast_results.txt"; do
+local blast_output="${BLAST_RESULT_DIR}/${blast_db_name}_complete_blast_results.txt"
+if [[ ! -s "$blast_output" ]]; then
+perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$BLAST_RESULT_DIR" "" "$taxon"
+echo "BLAST result saved to $blast_output"
+else
+echo "Skipping BLAST: results already exist for $taxon"
+fi
+for blast_result_file in "$blast_output"; do
 filter_blast_results "$blast_result_file" "$FILTERED_BLAST_RESULT_DIR" "$MIN_COVERAGE" "complete"
 done
 echo "Finished processing complete genomes for $taxon"
@@ -112,40 +112,36 @@ local blast_result_file="${DRAFT_BLAST_RESULT_DIR}/${blast_db_name}/iteration${i
 filter_blast_results "$blast_result_file" "$FILTERED_DRAFT_BLAST_RESULT_DIR" "$MIN_COVERAGE" "draft"
 done
 }
-echo "Running in $MODE mode"
-if [[ -n "$TAXON_FILE" ]]; then
-while read -r taxon || [[ -n "$taxon" ]]; do
-[[ -z "$taxon" ]] && continue
-process_complete_genomes "$taxon"
-[[ "$MODE" == "heavy" ]] && process_draft_genomes "$taxon"
-done < "$TAXON_FILE"
-else
-echo "No taxon file provided, processing all available complete genomes."
-while read -r taxon; do
-process_complete_genomes "$taxon"
-done < <(find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed -E '/[._][0-9]{2}$/s/[._][0-9]{2}$//' | sort -u)
-fi
 # Set up the output file headers
 if [[ "$MODE" == "heavy" ]]; then
 echo -e "Organism,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Draft_genomes_sample_size,Number_of_iterations,Complete_genomes_with_target_genes,Draft_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes,Percentage_with_target_genes_draft_genomes" > "$OUTPUT_FILE"
 else
 echo -e "Organism,Gene_ID,Min_percentage_of_coverage,Min_percentage_of_identity,Total_draft_genomes,Total_complete_genomes,Complete_genomes_with_target_genes,Percentage_with_target_genes_complete_genomes" > "$OUTPUT_FILE"
 fi
-# Ensure serotypes are loaded and process results for each serotype
-if [[ -z "$TAXON_FILE" ]]; then
-echo "No taxon file provided. Extracting taxa from pre-built BLAST database"
-# Rmove numeric suffix and convert underscores and dots to spaces
-TAXON_LIST=$(find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed -E '/[._][0-9]{2}$/s/[._][0-9]{2}$//' | sort -u)
-else
-TAXON_LIST=$(< "$TAXON_FILE")
+# Initialize TAXON_LIST
+TAXON_LIST=""
+if [[ -n "$TAXON_FILE" ]]; then
+if [[ ! -f "$TAXON_FILE" ]]; then
+tmp_taxon_file=$(mktemp)
+echo "$TAXON_FILE" > "$tmp_taxon_file"
+TAXON_FILE="$tmp_taxon_file"
+trap "rm -f '$tmp_taxon_file'" EXIT
 fi
-echo "$TAXON_LIST" | while read -r taxon || [[ -n "$taxon" ]]; do
+TAXON_LIST=$(< "$TAXON_FILE")
+else
+# Rmove numeric suffix and convert underscores and dots to spaces
+TAXON_LIST=$(find "$BLAST_DB_DIR" -name "*.nsq" -exec basename {} .nsq \; | sed -E '/[._][0-9]{2}$/s/[._][0-9]{2}$//' | sort -u |  sed 's/_/ /g' | sed -E 's/subsp /subsp. /g')
+fi
+# Process each taxon in TAXON_LIST
+while IFS= read -r taxon; do
 [[ -z "$taxon" ]] && continue
-local_taxon="${taxon// /_}"
-local_taxon="${local_taxon//./}"
-echo "Processing: $local_taxon"
+echo "Processing $taxon in $MODE mode"
+process_complete_genomes "$taxon"
+[[ "$MODE" == "heavy" ]] && process_draft_genomes "$taxon"
 TOTAL_COMPLETE_GENOMES=$(get_total_genomes_count "$taxon" "complete") 
 TOTAL_DRAFT_GENOMES=$(get_total_genomes_count "$taxon" "contig")
+local_taxon="${taxon// /_}"
+local_taxon="${local_taxon//./}"
 if [[ "$MODE" == "heavy" && "$TOTAL_DRAFT_GENOMES" -gt 0 ]]; then
 read -r DRAFT_SAMPLE_SIZE ITERATIONS <<< "$(calculate_sample_size_and_iterations "$TOTAL_DRAFT_GENOMES")"
 else
@@ -192,5 +188,5 @@ echo -e "$taxon,$GENE_ID,$MIN_COVERAGE,$MIN_IDENTITY,$TOTAL_DRAFT_GENOMES,$TOTAL
 fi
 fi
 done
-done
+done <<< "$TAXON_LIST"
 echo "Analysis complete. Results saved in $OUTPUT_FILE"
