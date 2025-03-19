@@ -9,7 +9,7 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
   - A pre-built BLAST database has been constructed for complete genomes. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
   - For draft genomes, users must provide their target taxa and have the option to define the sample size (default: 100) for each iteration, allowing for a controlled and flexible selection process.
   - Draft genome accessions are randomly chosen and retrieved using ncbi-genome-download, then downloaded using the datasets tool. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
-  - The sample size and number of iterations are automatically calculated using Cochran’s formula and finite population correction, based on the total number of draft genomes (contigs) available in GenBank. To maintain computational feasibility, the number of iterations is capped at 20.
+  - The sample size is automatically calculated using Cochran’s formula and finite population correction and and number of iterations are determined using square-root scaling, based on the total number of draft genomes (contigs) available in GenBank. To maintain computational feasibility, the number of iterations is capped at 20.
 
 **Genome files Organization**
 - Creates structured directories per genus, species, *Salmonella enterica* subspecies, and serotypes under *Salmonella enterica subsp. enterica*.
@@ -73,7 +73,7 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 │   │   ├── ...
 ```
 **BLAST Query & Analysis**
-- BLAST analysis is conducted in two stages: First, against pre-built complete genome databases to leverage high-quality genome assemblies. Then, against draft genome databases, which are iteratively constructed during runtime to ensure representative sampling for each genus, species, and *Salmonella enterica* serotypes group.
+- BLAST analysis is conducted in two stages: First, against pre-built complete genome databases to leverage high-quality genome assemblies. Then, against draft genome databases, which are iteratively constructed during runtime to ensure representative sampling for each target group.
 - Query gene file is provided by users (supports batch processing of multiple genes).
 - Filters results by user-defined minimum identity & coverage thresholds.
 
@@ -85,18 +85,18 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 To run this pipeline, set up a Conda environment with the required dependencies.
 1. Clone the Repository
 ```sh
-git clone https://github.com/Weifanwu66/SGP.git
-cd SGP
+git clone https://github.com/Weifanwu66/EGP.git
+cd EGP
 ```
 2. Create and Activate the Conda Environment
 The pipeline requires a Conda environment with all necessary dependencies. To create and activate it, run:
 ```sh
 conda env create -f environment.yml
-conda activate SGP
+conda activate EGP
 ```
 To verify the installation, check if all tools are installed:
 ```sh
-conda list | grep -E "sra-tools|seqkit|trimmomatic|skesa|blast|ncbi-datasets-cli|entrez-direct"
+conda list | grep -E "blast|ncbi-datasets-cli|entrez-direct"
 ```
 If any package is missing, please install it manually:
 ```sh
@@ -122,10 +122,26 @@ Usage: SGP.sh -g GENE_FILE -s SEROTYPE_FILE [--mode light|heavy] [--sra on|off] 
 -o OUTPUT_FILE : Output result file (default: gene_summary.tsv).
 ```
 ## Example usage:
+To download in default light mode
 ```sh
-bash SGP.sh -g target_genes.fasta -t serotype_list.txt --mode heavy -c 95 -i 95 -o output.csv
+bash EGP.sh -g target_genes.fasta -t taxa_list.txt
 ```
+If no taxa is provided, it will automatically screen for the whole database
+```sh
+bash EGP.sh -g target_genes.fasta
+```
+To define your minimum coverage and identity
+```sh
+bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy -c 95 -i 95
+```
+If you just want to query for one organism
+```sh
+bash EGP.sh -g target_genes.fasta -t "Salmonella" --mode heavy -c 95 -i 95
 
+You can choose to turn on heavy mode and name your output file, but by default, the output file will be stored in `result/gene_summary.csv`.
+```sh
+bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy -c 95 -i 95 -o output.csv
+```
 ## Output
 Examples of the final output file:
 
