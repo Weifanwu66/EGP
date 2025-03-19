@@ -1,5 +1,5 @@
 #!/bin/bash
-MONOPHASIC_TYPHIMURIUM_LIST="$(pwd)/database/complete_genomes/monophasic_Typhimurium_list.txt"
+MONOPHASIC_TYPHIMURIUM_LIST="$(pwd)/database/monophasic_Typhimurium_list.txt"
 function extract_taxon_info() {
 local input="$1"
 local taxon_name=""
