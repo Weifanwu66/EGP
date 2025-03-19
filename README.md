@@ -108,19 +108,6 @@ conda install -c bioconda <package_name>
 2. ncbi-genome-download: Blin, K. (2023). ncbi-genome-download (0.3.3). Zenodo. https://doi.org/10.5281/zenodo.8192486
 3. NCBI BLAST: https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html
 -----
-## Flags and Options
-The pipeline provides several flgas to customize execution:
-```sh
-Usage: SGP.sh -g GENE_FILE -s SEROTYPE_FILE [--mode light|heavy] [--sra on|off] [--sra_number N] [-c COVERAGE] [-i IDENTITY] [-o OUTPUT_FILE]
--g GENE_FILE : FASTA file with target gene sequence (required).
--s SEROTYPE_FILE : File containing Salmonella serotypes (required).
---mode MODE : Choose between heavyweight mode and lightweight mode (default: light).
---sra on|off : Enable or disable SRA assembly (default: off).
---sra_num N : Specify the number of SRA files to retrieve (max: 100, default 50).
--c COVERAGE : The minimum genome coverage (default: 80%).
--i IDENTITY : The minimum percentage of identity (default: 90%).
--o OUTPUT_FILE : Output result file (default: gene_summary.tsv).
-```
 ## Example usage:
 To download in default light mode
 ```sh
@@ -132,40 +119,22 @@ bash EGP.sh -g target_genes.fasta
 ```
 To define your minimum coverage and identity
 ```sh
-bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy -c 95 -i 95
+bash EGP.sh -g target_genes.fasta -t taxon_list.txt -c 95 -i 95
 ```
-If you just want to query for one organism
+To turn on heavy mode
 ```sh
-bash EGP.sh -g target_genes.fasta -t "Salmonella" --mode heavy -c 95 -i 95
-
+bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy
+```
+If you just want to look at one organism
+```sh
+bash EGP.sh -g target_genes.fasta -t "Salmonella"
+```
 You can choose to turn on heavy mode and name your output file, but by default, the output file will be stored in `result/gene_summary.csv`.
 ```sh
 bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy -c 95 -i 95 -o output.csv
 ```
+To overwrite the previous result, add `--overwrite`
 ## Output
 Examples of the final output file:
 
 Light mode
-| Serotype            | Gene_ID                     | Min_coverage | Min_percentage_of_identity | Total_draft_genomes |  Total_complete_genomes | Complete_genomes_with_target_gene | Percentage_with_target_gene_in_complete_genomes |
-|---------------------|-----------------------------|--------------|----------------------------|---------------------|-------------------------|-----------------------------------|-------------------------------------------------|
-| Enteritidis         | NC_003197.2:1707344-1707789 | 95           | 95                         | 41408               | 165                     | 164                               | 99.00%                                          |
-| Typhimurium         | NC_003197.2:1707344-1707789 | 95           | 95                         | 37382               | 226                     | 226                               | 100.00%                                         |
-| Typhimurium var. 5- | NC_003197.2:1707344-1707789 | 95           | 95                         | 825                 | 11                      | 11                                | 100.00%                                         |
-| Heidelberg          | NC_003197.2:1707344-1707789 | 95           | 95                         | 4905                | 51                      | 51                                | 100.00%                                         |
-| Infantis            | NC_003197.2:1707344-1707789 | 95           | 95                         | 16915               | 80                      | 80                                | 100.00%                                         |
-| Newport             | NC_003197.2:1707344-1707789 | 95           | 95                         | 8116                | 92                      | 92                                | 100.00%                                         |
-| Uganda              | NC_003197.2:1707344-1707789 | 95           | 95                         | 1254                | 12                      | 12                                | 100.00%                                         |
-| Braenderup          | NC_003197.2:1707344-1707789 | 95           | 95                         | 2565                | 5                       | 5                                 | 100.00%                                         |
-| Muenchen            | NC_003197.2:1707344-1707789 | 95           | 95                         | 2384                | 22                      | 22                                | 100.00%                                         |
-| Montevideo          | NC_003197.2:1707344-1707789 | 95           | 95                         | 4831                | 32                      | 31                                | 96.00%                                          |
-| Javiana             | NC_003197.2:1707344-1707789 | 95           | 95                         | 1748                | 8                       | 8                                 | 100.00%                                         |
-| Reading             | NC_003197.2:1707344-1707789 | 95           | 95                         | 1973                | 12                      | 12                                | 100.00%                                         |
-| Dublin              | NC_003197.2:1707344-1707789 | 95           | 95                         | 3831                | 28                      | 28                                | 100.00%                                         |
-| Oranienburg         | NC_003197.2:1707344-1707789 | 95           | 95                         | 1543                | 5                       | 5                                 | 100.00%                                         |
-| Potsdam             | NC_003197.2:1707344-1707789 | 95           | 95                         | 128                 | 1                       | 1                                 | 100.00%                                         |
-| Thompson            | NC_003197.2:1707344-1707789 | 95           | 95                         | 1727                | 17                      | 17                                | 100.00%                                         |
-| Saintpaul           | NC_003197.2:1707344-1707789 | 95           | 95                         | 3873                | 24                      | 24                                | 100.00%                                         |
-| Hadar               | NC_003197.2:1707344-1707789 | 95           | 95                         | 1927                | 15                      | 15                                | 100.00%                                         |
-| Schwarzengrund      | NC_003197.2:1707344-1707789 | 95           | 95                         | 3038                | 27                      | 27                                | 100.00%                                         |
-| Anatum              | NC_003197.2:1707344-1707789 | 95           | 95                         | 4843                | 40                      | 40                                | 100.00%                                         |
-| Berta               | NC_003197.2:1707344-1707789 | 95           | 95                         | 604                 | 3                       | 3                                 | 100.00%                                        
