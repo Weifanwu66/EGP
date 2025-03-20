@@ -77,8 +77,8 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 - Filters results by user-defined minimum identity & coverage thresholds.
 
 **Gene prevalence calculation**
-- The prevalence of the gene is calculated based on hits in complete genomes only.
-- Draft genomes may have variable quality, by incorporating multiple iterations, and the final prevalence estimate is averaged over all iterations, ensuring robustness against sampling bias.
+- **Light mode**: The prevalence of the gene is calculated based on hits in **complete genomes only**.
+- **heavy mode**: In addition to analyzing **complete genomes", this mode incorporates **Draft genomes** to provide a more comprehensive prevalence estimate. Since draft genomes may have variable quality, multiple iterations may perform. The final prevalence estimate is averaged over all iterations, ensuring robustness against sampling bias.
 ------
 ## Installation
 To run this pipeline, set up a Conda environment with the required dependencies.
