@@ -7,5 +7,4 @@ dependencies:
  - python=3.9
  - ncbi-genome-download
  - blast
- - ncbi-datasets-cli
  - entrez-direct
