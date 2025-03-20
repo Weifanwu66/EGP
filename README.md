@@ -103,9 +103,8 @@ conda install -c bioconda <package_name>
 ```
 -----
 ## Dependencies
-1. NCBI Datasets: https://github.com/ncbi/datasets
-2. ncbi-genome-download: Blin, K. (2023). ncbi-genome-download (0.3.3). Zenodo. https://doi.org/10.5281/zenodo.8192486
-3. NCBI BLAST: https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html
+1. ncbi-genome-download: Blin, K. (2023). ncbi-genome-download (0.3.3). Zenodo. https://doi.org/10.5281/zenodo.8192486
+2. NCBI BLAST: https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html
 -----
 ## Example usage:
 To download in default light mode
