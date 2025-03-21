@@ -163,12 +163,8 @@ COMPLETE_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $
 if [[ "$MODE" == "heavy" && "$TOTAL_DRAFT_GENOMES" -gt 0 ]]; then
 TOTAL_DRAFT_GENOMES_WITH_TARGET_GENES=0
 for ((i=1; i<="$ITERATIONS"; i++)); do
-echo "DEBUG: Checking for gene $GENE_ID in draft results:"
-head "$FILTERED_DRAFT_BLAST_RESULT_DIR/${local_taxon}/filtered_iteration_${i}_draft_blast_results.txt"
 DRAFT_GENOMES_WITH_TARGET_GENES=$(awk -v gene="$GENE_ID" '$1 == gene {print $2}' "$FILTERED_DRAFT_BLAST_RESULT_DIR/${local_taxon}/filtered_iteration_${i}_draft_blast_results.txt" 2>/dev/null | cut -c1-8 | sort -u | wc -l)
-echo "$DRAFT_GENOMES_WITH_TARGET_GENES"
 TOTAL_DRAFT_GENOMES_WITH_TARGET_GENES=$((TOTAL_DRAFT_GENOMES_WITH_TARGET_GENES + DRAFT_GENOMES_WITH_TARGET_GENES))
-echo "$TOTAL_DRAFT_GENOMES_WITH_TARGET_GENES"
 done
 AVERAGE_DRAFT_GENOMES_WITH_TARGET_GENES=$(echo "$TOTAL_DRAFT_GENOMES_WITH_TARGET_GENES/$ITERATIONS" | bc 2>/dev/null)
 PERCENT_WITH_TARGET_GENES_DRAFT_GENOMES=$(echo "scale=2; ($AVERAGE_DRAFT_GENOMES_WITH_TARGET_GENES/$DRAFT_SAMPLE_SIZE) * 100" | bc 2>/dev/null)
