@@ -97,7 +97,7 @@ conda activate EGP
 ```
 To verify the installation, check if all tools are installed:
 ```sh
-conda list | grep -E "blast|ncbi-datasets-cli|entrez-direct"
+conda list | grep -E "blast|ncbi-genome-download|entrez-direct"
 ```
 If any package is missing, please install it manually:
 ```sh
@@ -107,6 +107,7 @@ conda install -c bioconda <package_name>
 ## Dependencies
 1. ncbi-genome-download: Blin, K. (2023). ncbi-genome-download (0.3.3). Zenodo. https://doi.org/10.5281/zenodo.8192486
 2. NCBI BLAST: https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html
+3. entrez-direct: https://www.ncbi.nlm.nih.gov/books/NBK179288/
 -----
 ## Example usage:
 To download in default light mode
