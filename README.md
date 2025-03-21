@@ -135,16 +135,14 @@ To overwrite the previous result, add `--overwrite`
 ## Output
 Examples of the final output file:
 
-Light mode
+**Light mode**
 | Organism                            | Gene_ID                      | Min_percentage_of_coverage | Min_percentage_of_identity | Total_draft_genomes | Total_complete_genomes | Complete_genomes_with_target_genes | Percentage_with_target_genes_complete_genomes |
 | ----------------------------------- | ---------------------------- | -------------------------- | -------------------------- | ------------------- | ---------------------- | ---------------------------------- | --------------------------------------------- |
 | Salmonella enterica subsp. enterica | NC_003197.2:c3010816-3009905 | 90                         | 95                         | 235792              | 2307                   | 1924                               | 83.00%                                        |
 | Salmonella enterica subsp. enterica | NC_003197.2:3019846-3021524  | 90                         | 95                         | 235792              | 2307                   | 2270                               | 98.00%                                        |
 | Salmonella enterica subsp. enterica | NC_003197.2:c2925778-2923593 | 90                         | 95                         | 235792              | 2307                   | 2276                               | 98.00%                                        |
-| Salmonella enterica subsp. enterica | NC_003197.2:c3827997-3827461 | 90                         | 95                         | 235792              | 2307                   | 1711                               | 74.00%                                        |
-| Salmonella enterica subsp. enterica | NC_003197.2:c1329702-1329456 | 90                         | 95                         | 235792              | 2307                   | 2279                               | 98.00%                                        |
-| Salmonella enterica subsp. enterica | NC_003197.2:c3014479-3013795 | 90                         | 95                         | 235792              | 2307                   | 2274                               | 98.00%                                        |
-| Salmonella enterica subsp. enterica | NC_003197.2:1332234-1332798  | 90                         | 95                         | 235792              | 2307                   | 2280                               | 98.00%                                        |
-| Salmonella enterica subsp. enterica | NC_003197.2:c1310844-1309834 | 90                         | 95                         | 235792              | 2307                   | 2279                               | 98.00%                                        |
-| Salmonella enterica subsp. enterica | NC_003197.2:c3030909-3029121 | 90                         | 95                         | 235792              | 2307                   | 2272                               | 98.00%                                        |
-| Salmonella enterica subsp. enterica | NC_003197.2:3008100-3008967  | 90                         | 95                         | 235792              | 2307                   | 2285                               | 99.00%                                        |
+
+**Heavy mode**
+| Organism          | Gene_ID                     | Min_percentage_of_coverage | Min_percentage_of_identity | Total_draft_genomes | Total_complete_genomes | Draft_genomes_sample_size | Number_of_iterations | Complete_genomes_with_target_genes | Draft_genomes_with_target_genes | Percentage_with_target_genes_complete_genomes | Percentage_with_target_genes_draft_genomes |
+| ----------------- | --------------------------- | -------------------------- | -------------------------- | ------------------- | ---------------------- | ------------------------- | -------------------- | ---------------------------------- | ------------------------------- | --------------------------------------------- | ------------------------------------------ |
+| Salmonella Uganda | NC_003197.2:1707344-1707789 | 80                         | 90                         | 1173                | 12                     | 290                       | 1                    | 12                                 | 290                             | 100.00%                                       | 100.00%                                    |
