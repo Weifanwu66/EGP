@@ -66,7 +66,7 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 │   │   ├── Cronobacter_malonaticus/
 │   │   ├── ...
 │   ├── Proteus/
-│   │   ├── complete_genomes/
+│   │   ├── unclassified/
 │   │   ├── Proteus_mirabilis/
 │   │   ├── Proteus_vulgaris/
 │   │   ├── ...
