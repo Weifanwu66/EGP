@@ -73,8 +73,8 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 ```
 **BLAST Query & Analysis**
 - BLAST analysis can be run in two modes:
- - **Light mode**: The analysis is limited to pre-built complete genome databases, leveraging high-quality genome assemblies for faster performance.
- - **Heavy mode**: The pipeline runs BLAST searches against both complete and draft genome databases. The draft genomes databases are dynamically constructed during runtime to ensure representative sampling across each target group.
+  1. **Light mode**: The analysis is limited to pre-built complete genome databases, leveraging high-quality genome assemblies for faster performance.
+  2. **Heavy mode**: The pipeline runs BLAST searches against both complete and draft genome databases. The draft genomes databases are dynamically constructed during runtime to ensure representative sampling across each target group.
 - Query gene file is provided by users (supports batch processing of multiple genes).
 - Filters results by user-defined minimum identity & coverage thresholds.
 
