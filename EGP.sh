@@ -1,5 +1,5 @@
 #!/bin/bash
-# set initial variables and paths
+# Set initial variables and paths
 MODE="light"
 MIN_COVERAGE=80
 MIN_IDENTITY=90
@@ -7,14 +7,21 @@ WORK_DIR=$(pwd)
 TAXON_FILE=""
 GENE_FILE=""
 OUTPUT_FILE="${WORK_DIR}/result/gene_summary.csv"
-DRAFT_GENOMES_DIR="${WORK_DIR}/database/draft_genomes"
-BLAST_DB_DIR="${WORK_DIR}/database/complete_blast_db"
+DATABASE_DIR="${WORK_DIR}/database"
+# Default
+BLAST_DB_DIR="${DATABASE_DIR}/complete_blast_db"
+# Custom
+CUSTOM_GENOMES_DIR="${DATABASE_DIR}/complete_custom/complete_genomes"
+CUSTOM_BLAST_DB_DIR="${DATABASE_DIR}/complete_custom/complete_blast_db"
 BLAST_RESULT_DIR="${WORK_DIR}/result/complete_blast_results"
 FILTERED_BLAST_RESULT_DIR="${WORK_DIR}/result/filtered_complete_blast_results"
-DRAFT_BLAST_DB_DIR="${WORK_DIR}/database/draft_blast_db"
+DRAFT_GENOMES_DIR="${DATABASE_DIR}/draft_genomes"
+DRAFT_BLAST_DB_DIR="${DATABASE_DIR}/draft_blast_db"
 DRAFT_BLAST_RESULT_DIR="${WORK_DIR}/result/draft_blast_results"
 FILTERED_DRAFT_BLAST_RESULT_DIR="${WORK_DIR}/result/filtered_draft_blast_results"
 OVERWRITE=false
+# job scheduler variables
+runtime=24:00:00; hpcmem=360GB; hpcthreads=72; hpc=F; queue=NA; account=NA
 # usage setup
 usage(){
 echo "Usage: $0 -g GENE_FILE [-t TAXON] [-c COVERAGE] [-i IDENTITY] [-o OUTPUT_FILE] [--draft-sample N] [--mode light|heavy]"
@@ -26,7 +33,7 @@ echo "-o OUTPUT_FILE : Output result file (default: gene_summary.tsv)."
 echo "--mode light|heavy : Run in light mode (complete genomes only) or heavy mode (complete+draft genomes, default: light)."
 echo "--overwrite : If overwrite mode is enabled, previous results will be cleared (default: false)."
 }
-# Parse argument
+# Parse argument (adapted)
 while [[ "$#" -gt 0 ]]; do
 case "$1" in
 -t) TAXON_FILE="$2"; shift ;;
@@ -34,13 +41,167 @@ case "$1" in
 -c) MIN_COVERAGE="$2"; shift ;;
 -i) MIN_IDENTITY="$2"; shift ;;
 -o) OUTPUT_FILE="$2"; shift ;;
---mode) MODE="$2"; shift ;;
---overwrite) OVERWRITE=true ;;
+-p) hpc="$2"; shift ;;
+-q) queue="$2"; shift ;;
+-r) runtime="$2"; shift ;;
+-m) hpcmem="$2"; shift ;;
+-C) hpcthreads="$2"; shift ;;
+-a) account="$2"; shift ;;
+-H) MODE="$2"; shift ;;
+-O) OVERWRITE="$2"; shift ;;
+-d) DOWNLOAD_FILE="$2"; shift ;;
 -h|--help) usage; exit 0 ;;
 *) echo "Invalid option: $1"; usage; exit 1 ;;
 esac
 shift
 done 
+
+#adapted from GEAbash_v1.0.0; seems to be working as expected
+#while getopts ':g:t::c::i::o::p::q::r::m::C::a::H::O::h::' flag; do
+#  case "${flag}" in
+#    g) GENE_FILE="${OPTARG}" ;;    t) TAXON_FILE="${OPTARG}" ;;    c) MIN_COVERAGE="${OPTARG}" ;;
+#    i) MIN_IDENTITY="${OPTARG}" ;;    o) OUTPUT_FILE="${OPTARG}" ;;    p) hpc="${OPTARG}" ;;
+#    q) queue="${OPTARG}" ;;    r) runtime="${OPTARG}" ;;    m) hpcmem="${OPTARG}" ;;
+#    C) hpcthreads="${OPTARG}" ;;    a) account="${OPTARG}" ;;    H) MODE="${OPTARG}" ;;
+#    O) OVERWRITE="${OPTARG}" ;;
+#    -h|--help) usage; exit 0 ;;
+#    *) echo "Invalid option: $1"; usage
+#       exit 1 ;;    esac; done
+
+
+while [ $hpc == F ]; do
+
+# detect and utilize slurm or sge job manager. tested on atlas/ceres (slurm) and hank (sge) hpcs and putatively any other systems as requested by users.
+# progresses to an expected `find` error line 292
+# suspected dependencies: 1) conda (unless some testing/development done independent). e.g. the batch script slurm template in GEAbash calls 
+# module load apptainer and I expect this slurm template will ultimately need to call module load miniconda (ceres) or module load miniconda3 (atlas)
+# 2) The batch template will need to be in the same directory as EGP.sh and both will need to be in $(pwd)
+# more testing to be done after have THE database.
+if [ ! $queue == "NA" ]; then 
+
+#detect job submission system
+if [ -n "$(sinfo 2>/dev/null)" ]; then submsys=slurm
+#detect sge
+elif [ -n "$(qhost 2>/dev/null)" ]; then submsys=sge
+#exit if queue specified but no job scheduler detected
+else echo -n "queue specified but hpc system "
+echo "uncertain. exiting"; exit 1; fi
+
+#if sge, remove any logs from previous runs
+if [[ " ${submsys} " = " sge " ]]; then 
+if [ -f sge2.sh ]; then rm sge2_EGP.* >/dev/null 2>&1; sleep 60; fi
+#then go get a new sge template file to use for THIS EGP run
+cp sge.sh sge2.sh
+#if slurm, remove any logs from previous runs
+elif [[ " ${submsys} " = " slurm " ]]; then
+if [ -f slurm2.sh ]; then rm slurm2*.out >/dev/null 2>&1; sleep 60; fi
+#then go get a new slurm template file to use for THIS GEAbash run
+cp slurm.sh slurm2.sh
+#otherwise exit. this line should be unnecessary
+else echo "system uncertain. exiting"; exit 1
+fi
+
+###if sge...
+if [[ " ${submsys} " = " sge " ]]
+#alert the user
+then echo -n "preparing to run EGP in hpc cluster mode. "
+echo -n "EGP log outputs will be in the hpc submission system "
+echo "log files for sge. e.g., EGP.e* & EGP.o*"
+#edit the sge template with local variables and user arguments
+sed -i "s/name/sge2_EGP/g" sge2.sh #local
+sed -i "s/queue/$queue/g" sge2.sh #user
+sed -i "s/runtime/$runtime/g" sge2.sh #user
+sed -i "s/RAM/$hpcmem/g" sge2.sh #user
+sed -i "s/hpctasks/$hpcthreads/g" sge2.sh #user
+#write the EGP command to the sge template
+#to use this design syntax, all user options need single dash shortcuts
+#e.g --mode heavy and --overwrite become -H heavy and -O true respectively.
+#lines 201-205 assume -m <RAM> -q <queue> -r <runtime> in 
+#user supplied arguments to EGP or EGP defaults
+#lines 214,221 assume -g -c -i -o -H -O -t in 
+#user supplied arguments to EGP or EGP defaults
+sed -i \
+'s%command%bash EGP.sh -g "${GENE_FILE}" -c "${MIN_COVERAGE}" -i "${MIN_IDENTITY}" -o "${OUTPUT_FILE}" -H "${MODE}" -O "${OVERWRITE}" -t "${TAXON_FILE}" -p T%g' \
+sge2.sh
+#write the needed variables to the sge template
+#the last variable tells EGP that ${"hpc"} = T
+#so that this entire while loop will be skipped
+#by the EGP resubmission
+sed -i \
+"s%vars%OVERWRITE='$OVERWRITE'; GENE_FILE='$GENE_FILE'; MIN_COVERAGE='$MIN_COVERAGE'; MIN_IDENTITY='$MIN_IDENTITY'; OUTPUT_FILE='$OUTPUT_FILE'; MODE='$MODE'; TAXON_FILE='$TAXON_FILE'%g" \
+sge2.sh
+
+#make sure the user provided account is written to the template
+if [ $account == "NA" ]
+then other='##'
+sed -i "s/account/$other/g" sge2.sh
+sed -i "s/-P #/###/g" sge2.sh
+else sed -i "s/account/$account/g" sge2.sh #an optional user supplied variable
+fi
+#submit the sge batch job containing the EGP
+#command from line 214
+qsub sge2.sh
+#exit normally without error
+exit 0
+
+###if slurm...
+else echo -n "preparing to run EGP in hpc cluster mode. "
+echo -n "EGP log outputs will be in the hpc submission system "
+echo "log files for slurm. e.g., slurm2-*.out"
+#edit the slurm template with local variables and user arguments
+sed -i "s/name/slurm2_EGP/g" slurm2.sh #local
+sed -i "s/queue/$queue/g" slurm2.sh #user
+sed -i "s/runtime/$runtime/g" slurm2.sh #user
+sed -i "s/RAM/$hpcmem/g" slurm2.sh #user
+sed -i "s/hpctasks/$hpcthreads/g" slurm2.sh #user
+sed -i 's/other/$other/g' slurm2.sh #local.
+#write the GEA command to the slurm template
+sed -i \
+'s%command%bash EGP.sh -g "${GENE_FILE}" -c "${MIN_COVERAGE}" -i "${MIN_IDENTITY}" -o "${OUTPUT_FILE}" -H "${MODE}" -O "${OVERWRITE}" -t "${TAXON_FILE}" -p T%g' \
+slurm2.sh
+#write the needed variables to the slurm template
+#the last variable tells EGP that ${"hpc"} = T
+#so that this entire while loop will be skipped
+#by the EGP resubmission
+sed -i \
+"s%vars%OVERWRITE='$OVERWRITE'; GENE_FILE='$GENE_FILE'; MIN_COVERAGE='$MIN_COVERAGE'; MIN_IDENTITY='$MIN_IDENTITY'; OUTPUT_FILE='$OUTPUT_FILE'; MODE='$MODE'; TAXON_FILE='$TAXON_FILE'%g" \
+slurm2.sh
+
+#make sure the user provided account is written to the template
+if [ $account == "NA" ]
+then other='##'
+sed -i "s/account/$other/g" slurm2.sh
+sed -i "s/-A #/###/g" slurm2.sh
+else sed -i "s/account/$account/g" slurm2.sh
+fi
+#submit the slurm batch job containing the EGP
+#command from line 250
+sbatch slurm2.sh
+#exit normally without error
+exit 0
+#finish the if statement started line 195.
+fi
+#finish the if statement started line 170.
+fi
+#if the user has NOT specified a queue then prepare
+#to run EGP normally
+if [ $queue == "NA" ]
+then echo "EGP continuing without job submission system"
+#if a job submission system is detected,
+#alert the user and exit with error.
+if [ -n "$(sinfo 2>/dev/null)" ]
+then echo -n "queue not specified for running "
+echo "in hpc mode. exiting"; exit 1
+elif [ -n "$(qhost 2>/dev/null)" ]
+then echo -n "queue not specified for running "
+echo "in hpc mode. exiting"; exit 1
+fi
+#finish the if statement started line 161
+fi
+#if made it this far, set hpc to T to break while loop.
+hpc=T
+done
+
 if [[ "$OVERWRITE" == true ]]; then
 rm -rf "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR" "$DRAFT_BLAST_RESULT_DIR" "$DRAFT_BLAST_DB_DIR" "$FILTERED_BLAST_RESULT_DIR" "$DRAFT_GENOMES_DIR" "$FILTERED_DRAFT_BLAST_RESULT_DIR" "$OUTPUT_FILE"
 fi
@@ -58,6 +219,38 @@ fi
 # Output directory setup
 mkdir -p "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR"
 source "${WORK_DIR}/function.sh" || { echo "Error sourcing function.sh". exit 1; }
+# Handle custom download if provided
+if [[ -n "$DOWNLOAD_FILE" ]]; then
+echo "Custom panel downloaded requested."
+GENOME_DIR="$CUSTOM_GENOMES_DIR"
+BLAST_DB_DIR="$CUSTOM_BLAST_DB_DIR"
+mkdir -p "$CUSTOM_GENOMES_DIR"
+mkdir -p "$CUSTOM_BLAST_DB_DIR"
+while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+taxon=$(echo "$raw_line" | tr -d '\r')
+if [ -z "$taxon" ]; then
+continue
+fi
+if [[ "$taxon" =~ ^[A-Z][a-z]+$ ]]; then
+echo "Downloading genus: $taxon"
+download_genus "$taxon" "$GENOME_DIR"
+get_species_list "$taxon" "$GENOME_DIR"
+download_species "$taxon" "$GENOME_DIR"
+elif [[ "$taxon" =~ ^[A-Z][a-z]+\ [a-z]+$ ]]; then
+echo "Downloading species: $taxon"
+download_species "$taxon" "$GENOME_DIR"
+fi
+done < "$DOWNLOAD_FILE"
+echo "Organizing unclassified genomes"
+move_unclassified_genomes "$GENOME_DIR"
+echo "Building BLAST databases for custom panel"
+build_blastdb "$GENOME_DIR" "$BLAST_DB_DIR"
+echo "Custom panel build complete."
+else
+GENOME_DIR=""
+echo "Default mode: using prebuilt BLAST database."
+fi
+
 # Set delimiter as a space
 if [[ -n "$TAXON_FILE" ]]; then
 if [[ ! -f "$TAXON_FILE" ]]; then
@@ -69,6 +262,7 @@ fi
 DELIMITER=" "
 sed 's/[\t,]\+/ /g' "$TAXON_FILE" > "${TAXON_FILE}_processed"
 # Ensure if a taxon file is provided, the genus should be one of the target Enterobacteriaceae
+if [[ -z "$DOWNLOAD_FILE" ]]; then
 awk -v delim="$DELIMITER" '
 BEGIN { FS=delim; OFS=delim }
 { 
@@ -76,13 +270,16 @@ gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
 gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
 genus = $1
 species_or_serotype = ($2 != "") ? $2 : ""
-if (genus !~ /^(Proteus|Salmonella|Escherichia|Citrobacter|Enterobacter|Klebsiella|Shigella|Cronobacter)$/) {
-print "Error: Invalid genus in taxon file. Allowed: Proteus, Salmonella, Escherichia, Citrobacter, Enterobacter, Klebsiella, Shigella, Cronobacter."
+if (genus !~ /^(Salmonella|Escherichia|Citrobacter|Enterobacter|Klebsiella|Shigella|Cronobacter)$/) {
+print "Error: Invalid genus in taxon file. Allowed: Salmonella, Escherichia, Citrobacter, Enterobacter, Klebsiella, Shigella, Cronobacter."
 print "Your line:", $0
 exit 1 
 }
 }' "${TAXON_FILE}_processed" || exit 1
-rm "${TAXON_FILE}_processed"
+else
+echo "Custom database mode detected - skipping taxon genus restriction check."
+fi
+rm -f "${TAXON_FILE}_processed"
 fi
 # start with core processing functions
 process_complete_genomes() {
