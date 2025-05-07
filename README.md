@@ -65,11 +65,6 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 │   │   ├── Cronobacter_sakazakii/
 │   │   ├── Cronobacter_malonaticus/
 │   │   ├── ...
-│   ├── Proteus/
-│   │   ├── unclassified/
-│   │   ├── Proteus_mirabilis/
-│   │   ├── Proteus_vulgaris/
-│   │   ├── ...
 ```
 **BLAST Query & Analysis**
 - BLAST analysis can be run in two modes:
