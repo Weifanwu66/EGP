@@ -5,16 +5,20 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 
 ## Features
 **Genomic Data Acquisition**
-  - Due to the large storage requirements, genome sequence files used to build BLAST database will not be uploaded to this repository. Instead, metadata files containing all assembly accessions for the downloaded genomes are provided for each respective directory and stored in `database/metadata`. This ensures traceability and allows users to retrieve specific assemblies if needed.
-  - A pre-built BLAST database has been constructed for complete genomes. However, since some complete genomes are relatively small and may not be representative of the full genetic diversity of a taxon, users may choose to enable **heavy mode** to include draft genomes in their analysis.
-  - For **heavy mode**, users must provide their target taxa. Draft genomes for each taxon are retrieved and randomly shuffled before selection based on their accessions using ncbi-genome-download. The draft genomes are iteratively sampled due to their large number, ensuring representative sampling across taxa.
-  - The sample size per iteration is automatically calculated using Cochran’s formula and finite population correction and and number of iterations are determined using square-root scaling, based on the total number of draft genomes (contigs) available in GenBank. To maintain computational feasibility, the number of iterations is capped at 20.
+### Genomic Data Acquisition
+* **Storage‑friendly metadata:** Because of the large storage requirements, genome sequence files used to build the BLAST database are **not** stored in this repository. Instead, `database/metadata` holds the assembly‑accession lists so users can re‑download any sequence on demand.  
+* **Pre‑built complete‑genome database:** A BLAST database built from complete genomes of the default seven Enterobacteriaceae genera is provided for quick, high‑quality searches.  
+* **Heavy mode (`‑H heavy` + `‑t <taxon_file>`):** Adds draft genomes to the analysis. Draft assemblies for each target taxon are downloaded with *ncbi‑genome‑download*, shuffled, and sampled in iterations (Cochran’s formula with finite‑population correction; ≤ 20 iterations) to capture diversity while keeping runtime reasonable.  
+* **Custom genome panel (`‑d <genus_file>`):** Lets users work **outside** the default Enterobacteriaceae set. Supply a text file (one genus per line) and the pipeline will download the corresponding **complete genomes**, build a bespoke BLAST database in real time, and then run either LIGHT or HEAVY mode against that database.
+
+> **Note:** Building either the pre‑built archive or a large custom panel requires significant disk and CPU resources. Run these steps on an HPC system or a workstation with ≥ 250 GB free space.
+
+---
 
 **Genome files Organization**
-- Creates structured directories per genus, species, *Salmonella enterica* subspecies, and serotypes under *Salmonella enterica subsp. enterica*.
-- Maintains an unclassified directory for each taxon.
-- Draft genomes are downloaded randomly in iterations and stored separately within the draft genome directory.
-- The script to download complete genomes is download_complete_genomes.sh and the script to build the BLAST database is makeblastdb_complete_genomes.sh.
+Creates a structured directory hierarchy per genus → species → (for *Salmonella enterica*) subspecies → serotype. Unclassified genomes are placed in an `unclassified/` subfolder for each taxon.  
+Complete‑genome downloads live under `complete_genome/`; draft‑genome iterations are stored separately under `draft_genome/`.  
+The script to download complete genomes and their corresponding BLAST DB is build_EB_complete_genomes_database.sh
 ```
 │   ├── Escherichia/
 │   │   ├── unclassified/
