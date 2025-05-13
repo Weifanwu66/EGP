@@ -15,8 +15,8 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 ---
 
 ### Genome files Organization
-Creates a structured directory hierarchy per genus → species → (for *Salmonella enterica*) subspecies → serotype. Unclassified genomes are placed in an `unclassified/` subfolder for each taxon.  
-Complete‑genome downloads live under `complete_genome/`; draft‑genome iterations are stored separately under `draft_genome/`.  
+* Creates a structured directory hierarchy per genus → species → (for *Salmonella enterica*) subspecies → serotype. Unclassified genomes are placed in an `unclassified/` subfolder for each taxon.  
+* Complete‑genome downloads live under `complete_genome/`; draft‑genome iterations are stored separately under `draft_genome/`.  
 The script to download complete genomes and their corresponding BLAST DB is build_EB_complete_genomes_database.sh
 ```
 │   ├── Escherichia/
@@ -71,7 +71,7 @@ The script to download complete genomes and their corresponding BLAST DB is buil
 ```
 ---
 
-**BLAST Query & Analysis**
+### BLAST Query & Analysis
 * **Light mode (default):** Runs BLAST only against the complete‑genome database (pre‑built or custom `‑d`). Fastest, highest assembly quality.  
 * **Heavy mode:** Adds a draft‑genome database, dynamically constructed during runtime to improve prevalence estimates in clades with sparse complete genomes. Requires both `‑H heavy` and a species‑level target file via `‑t`.  
 * **Query genes:** Provide a multi‑FASTA file with one or many genes via `‑g`.  
@@ -79,13 +79,13 @@ The script to download complete genomes and their corresponding BLAST DB is buil
 
 ---
 
-**Gene prevalence calculation**
+### Gene prevalence calculation
 * **Light mode:** Prevalence is calculated from hits in complete genomes only.  
 * **Heavy mode:** Prevalence combines complete‑genome hits and the averaged result of up to 20 draft‑genome iterations, improving robustness to sampling bias.
 
 ---
 
-**SLURM Integration**
+### SLURM Integration
 
 EGP is designed to run efficiently on high‑performance computing (HPC) systems managed by **SLURM** workload managers.
 
@@ -124,7 +124,7 @@ squeue -u $USER
 
 # Check detailed information on a specific job
 scontrol show job <jobID>
-
+```
 ## Installation
 To run this pipeline, set up a Conda environment with the required dependencies.
 1. Clone the Repository
