@@ -6,13 +6,11 @@ MIN_IDENTITY=90
 WORK_DIR=$(pwd)
 TAXON_FILE=""
 GENE_FILE=""
+DOWNLOAD_FILE=""
 OUTPUT_FILE="${WORK_DIR}/result/gene_summary.csv"
 DATABASE_DIR="${WORK_DIR}/database"
-# Default
 BLAST_DB_DIR="${DATABASE_DIR}/complete_blast_db"
-# Custom
-CUSTOM_GENOMES_DIR="${DATABASE_DIR}/complete_custom/complete_genomes"
-CUSTOM_BLAST_DB_DIR="${DATABASE_DIR}/complete_custom/complete_blast_db"
+CUSTOM_GENOMES_DIR="${DATABASE_DIR}/complete_genomes"
 BLAST_RESULT_DIR="${WORK_DIR}/result/complete_blast_results"
 FILTERED_BLAST_RESULT_DIR="${WORK_DIR}/result/filtered_complete_blast_results"
 DRAFT_GENOMES_DIR="${DATABASE_DIR}/draft_genomes"
@@ -235,14 +233,10 @@ source "${WORK_DIR}/function.sh" || { echo "Error sourcing function.sh". exit 1;
 if [[ -n "$DOWNLOAD_FILE" ]]; then
 echo "Custom panel downloaded requested."
 GENOME_DIR="$CUSTOM_GENOMES_DIR"
-BLAST_DB_DIR="$CUSTOM_BLAST_DB_DIR"
 mkdir -p "$CUSTOM_GENOMES_DIR"
-mkdir -p "$CUSTOM_BLAST_DB_DIR"
-while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+while IFS= read -r raw_line; do
 taxon=$(echo "$raw_line" | tr -d '\r')
-if [ -z "$taxon" ]; then
-continue
-fi
+[[ -z "$taxon" ]] && continue
 if [[ "$taxon" =~ ^[A-Z][a-z]+$ ]]; then
 echo "Downloading genus: $taxon"
 download_genus "$taxon" "$GENOME_DIR"
