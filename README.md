@@ -169,7 +169,7 @@ bash EGP.sh -g test_gene.fasta -q ceres -r 04:00:00 -m 16G -C 8 -H light
 bash EGP.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 16 -H heavy
 ```
 
-### 3. Custom Genome Panel (e.g., Listeria + Pseudomonas) — Light Mode
+### 3. Custom Genome Panel — Light Mode
 
 ```bash
 bash EGP.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12 -H light
@@ -195,7 +195,7 @@ bash EGP.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -H light -O true
 - `-d` (custom genus panel file) is used to download genera outside the default Enterobacteriaceae set.
 - Ensure requested memory (`-m`) and runtime (`-r`) are appropriate for your HPC environment.
 - Building custom databases with `-d` should be performed on nodes with ≥250 GB available disk space.
-
+- ** Test input files (`test_gene.fasta`, `test_taxon.txt`, and `download_taxon.txt`) can be found in the `test/` directory.**
 ---
 
 ## Output
