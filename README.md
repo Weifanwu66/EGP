@@ -157,31 +157,47 @@ conda install -c bioconda <package_name>
 -----
 
 ## Example commands:
-To download in default light mode
-```sh
-bash EGP.sh -g target_genes.fasta -t taxa_list.txt
+### 1. Run Light Mode with Pre-built Database (Default 7 Enterobacteriaceae Genera)
+
+```bash
+bash EGP.sh -g test_gene.fasta -q ceres -r 04:00:00 -m 16G -C 8 -H light
 ```
-If no taxa is provided, it will automatically screen for the whole database
-```sh
-bash EGP.sh -g target_genes.fasta
+
+### 2. Run Heavy Mode with Pre-built Database (Default 7 Enterobacteriaceae Genera)
+
+```bash
+bash EGP.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 16 -H heavy
 ```
-To define your minimum coverage and identity
-```sh
-bash EGP.sh -g target_genes.fasta -t taxon_list.txt -c 95 -i 95
+
+### 3. Custom Genome Panel (e.g., Listeria + Pseudomonas) — Light Mode
+
+```bash
+bash EGP.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12 -H light
 ```
-To turn on heavy mode
-```sh
-bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy
+
+### 4. Custom Genome Panel — Heavy Mode
+
+```bash
+bash EGP.sh -g test_gene.fasta -d download_taxon.txt -t test_taxon.txt -q ceres -r 12:00:00 -m 48G -C 24 -H heavy
 ```
-If you just want to look at one organism
-```sh
-bash EGP.sh -g target_genes.fasta -t "Salmonella"
+
+### 5. Overwrite Previous Results
+
+```bash
+bash EGP.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -H light -O true
 ```
-You can choose to turn on heavy mode and name your output file, but by default, the output file will be stored in `result/gene_summary.csv`.
-```sh
-bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy -c 95 -i 95 -o output.csv
-```
-To overwrite the previous result, add `-O TRUE`
+
+---
+
+*Note:* 
+- `-g` (gene FASTA) is always required.
+- `-t` (species target file) must be provided in heavy mode.
+- `-d` (custom genus panel file) is used to download genera outside the default Enterobacteriaceae set.
+- Ensure requested memory (`-m`) and runtime (`-r`) are appropriate for your HPC environment.
+- Building custom databases with `-d` should be performed on nodes with ≥250 GB available disk space.
+
+---
+
 ## Output
 Examples of the final output file:
 
