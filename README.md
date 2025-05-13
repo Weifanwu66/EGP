@@ -9,7 +9,7 @@ This tool is designed for estimating the prevalence of a specific gene in Entero
 * **Storage‑friendly metadata:** Because of the large storage requirements, genome sequence files used to build the BLAST database are **not** stored in this repository. Instead, `database/metadata` holds the assembly‑accession lists so users can re‑download any sequence on demand.  
 * **Pre‑built complete‑genome database:** A BLAST database built from complete genomes of the default seven Enterobacteriaceae genera is provided for quick, high‑quality searches.  
 * **Heavy mode (`‑H heavy` + `‑t <taxon_file>`):** Adds draft genomes to the analysis. Draft assemblies for each target taxon are downloaded with *ncbi‑genome‑download*, shuffled, and sampled in iterations (Cochran’s formula with finite‑population correction; ≤ 20 iterations) to capture diversity while keeping runtime reasonable.  
-* **Custom genome panel (`‑d <genus_file>`):** Lets users work **outside** the default Enterobacteriaceae set. Supply a text file (one genus per line) and the pipeline will download the corresponding **complete genomes**, build a bespoke BLAST database in real time, and then run either LIGHT or HEAVY mode against that database.
+* **Custom genome panel (`‑d <download_file>`):** Lets users work **outside** the default Enterobacteriaceae genus. Supply a text file (one genus per line) and the pipeline will download the corresponding **complete genomes**, build a bespoke BLAST database in real time, and then run either LIGHT or HEAVY mode against that database.
 
 > **Note:** Building either the pre‑built archive or a large custom panel requires significant disk and CPU resources. Run these steps on an HPC system or a workstation with ≥ 250 GB free space.
 
@@ -70,17 +70,62 @@ The script to download complete genomes and their corresponding BLAST DB is buil
 │   │   ├── Cronobacter_malonaticus/
 │   │   ├── ...
 ```
+---
+
 **BLAST Query & Analysis**
-- BLAST analysis can be run in two modes:
-  1. **Light mode**: The analysis is limited to pre-built complete genome databases, leveraging high-quality genome assemblies for faster performance.
-  2. **Heavy mode**: The pipeline runs BLAST searches against both complete and draft genome databases. The draft genomes databases are dynamically constructed during runtime to ensure representative sampling across each target group.
-- Query gene file is provided by users (supports batch processing of multiple genes).
-- Filters results by user-defined minimum identity & coverage thresholds.
+* **Light mode (default):** Runs BLAST only against the complete‑genome database (pre‑built or custom `‑d`). Fastest, highest assembly quality.  
+* **Heavy mode:** Adds a draft‑genome database, dynamically constructed during runtime to improve prevalence estimates in clades with sparse complete genomes. Requires both `‑H heavy` and a species‑level target file via `‑t`.  
+* **Query genes:** Provide a multi‑FASTA file with one or many genes via `‑g`.  
+* **Filtering:** Results are filtered by user‑defined minimum identity (`‑I`) and coverage (`‑C`) thresholds.
+
+---
 
 **Gene prevalence calculation**
-- **Light mode**: The prevalence of the gene is calculated based on hits in **complete genomes only**.
-- **heavy mode**: In addition to analyzing **complete genomes**, this mode incorporates **Draft genomes** to provide a more comprehensive prevalence estimate. Since draft genomes may have variable quality, multiple iterations may perform. The final prevalence estimate is averaged over all iterations, ensuring robustness against sampling bias.
-------
+* **Light mode:** Prevalence is calculated from hits in complete genomes only.  
+* **Heavy mode:** Prevalence combines complete‑genome hits and the averaged result of up to 20 draft‑genome iterations, improving robustness to sampling bias.
+
+---
+
+**SLURM Integration**
+
+EGP is designed to run efficiently on high‑performance computing (HPC) systems managed by **SLURM** workload managers.
+
+Built‑in SLURM support enables:
+
+* **Automatic job submission**: EGP can generate SLURM batch scripts internally when queues (`‑q`), resources (`‑m`, `‑r`), and node constraints are specified.
+* **Flexible resource requests**: Users can control memory, CPU cores, wall‑time, and partition selection through command‑line options.
+* **Robust parallelism**: Multiple `blastn` processes and download threads are automatically parallelized across available CPUs.
+* **Queue compatibility**: Tested on partitions like `ceres`, `short`, and `long` on SCINet clusters (Ceres, Atlas).
+
+> **Important:** It is recommended to run database‑building steps (`build_EB_complete_genomes_database.sh`, custom complete genome panels via `‑d`) on HPC nodes with ≥ 250 GB free storage and appropriate wall‑time requests (e.g., `‑r 12:00:00`).
+
+#### Example SLURM submission (automatic through EGP)
+
+```bash
+# Run light mode using custom database on SCINet (partition ceres, 8 CPUs, 16 GB RAM, 4 hours max)
+bash EGP.sh -g genes.fasta -d download_taxon.txt -q ceres -C 8 -m 16G -r 04:00:00 -H light
+```
+
+### SLURM Parameters Exposed in EGP
+
+| Flag | Meaning |
+|:-----|:--------|
+| `‑q` | Partition (queue) name (e.g., `ceres`, `short`, `long`) |
+| `‑r` | Requested wall‑time (e.g., `04:00:00`) |
+| `‑m` | Requested memory (e.g., `16G`) |
+| `‑C` | Number of CPU cores |
+
+#### Monitoring Jobs
+
+Monitor your jobs using the following SLURM commands:
+
+```bash
+# View running and queued jobs
+squeue -u $USER
+
+# Check detailed information on a specific job
+scontrol show job <jobID>
+
 ## Installation
 To run this pipeline, set up a Conda environment with the required dependencies.
 1. Clone the Repository
@@ -102,13 +147,17 @@ If any package is missing, please install it manually:
 ```sh
 conda install -c bioconda <package_name>
 ```
------
+
+---
+
 ## Dependencies
 1. ncbi-genome-download: Blin, K. (2023). ncbi-genome-download (0.3.3). Zenodo. https://doi.org/10.5281/zenodo.8192486
 2. NCBI BLAST: https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html
 3. entrez-direct: https://www.ncbi.nlm.nih.gov/books/NBK179288/
+
 -----
-## Example usage:
+
+## Example commands:
 To download in default light mode
 ```sh
 bash EGP.sh -g target_genes.fasta -t taxa_list.txt
@@ -133,7 +182,7 @@ You can choose to turn on heavy mode and name your output file, but by default, 
 ```sh
 bash EGP.sh -g target_genes.fasta -t taxon_list.txt --mode heavy -c 95 -i 95 -o output.csv
 ```
-To overwrite the previous result, add `--overwrite`
+To overwrite the previous result, add `-O TRUE`
 ## Output
 Examples of the final output file:
 
