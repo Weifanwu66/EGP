@@ -23,38 +23,50 @@ OVERWRITE=false
 # job scheduler variables
 runtime=24:00:00; hpcmem=360GB; hpcthreads=72; hpc=F; queue=NA; account=NA
 # usage setup
-usage(){
-echo "Usage: $0 -g GENE_FILE [-t TAXON] [-c COVERAGE] [-i IDENTITY] [-o OUTPUT_FILE] [--draft-sample N] [--mode light|heavy]"
-echo "-g GENE_FILE : FASTA file with target gene sequence (required)." 
-echo "-t TAXON_FILE : File containing target taxons (one target per line) or a single taxon name (e.g., "Salmonella Typhimurium"); A taxon_file is always recommended and must be provided in heavy mode."
-echo "-c COVERAGE : The minimum genome coverage (default: 80%)." 
-echo "-i IDENTITY : The minimum percentage of identity (default: 90%)."
-echo "-o OUTPUT_FILE : Output result file (default: gene_summary.tsv)."
-echo "--mode light|heavy : Run in light mode (complete genomes only) or heavy mode (complete+draft genomes, default: light)."
-echo "--overwrite : If overwrite mode is enabled, previous results will be cleared (default: false)."
+usage() {
+    echo "Usage: $0 -g GENE_FILE [-t TAXON_FILE] [-d DOWNLOAD_FILE] [-c COVERAGE] [-i IDENTITY] [-o OUTPUT_FILE] [-p HPC_CLUSTER] [-q QUEUE] [-r RUNTIME] [-m MEMORY] [-C THREADS] [-a ACCOUNT] [-H MODE] [-O OVERWRITE] [-h|--help]"
+    echo ""
+    echo "Required arguments:"
+    echo "-g GENE_FILE      : FASTA file containing target gene sequences."
+    echo ""
+    echo "Optional arguments:"
+    echo "-t TAXON_FILE     : File containing target species (one per line) or a single taxon name."
+    echo "-d DOWNLOAD_FILE  : File listing target genera (one per line) to download complete genomes."
+    echo "-c COVERAGE       : Minimum genome coverage threshold (default: 80%)."
+    echo "-i IDENTITY       : Minimum percentage identity threshold (default: 90%)."
+    echo "-o OUTPUT_FILE    : Output filename for results (default: gene_summary.tsv)."
+    echo "-p HPC_CLUSTER    : HPC system name (optional; future compatibility)."
+    echo "-q QUEUE          : Queue/partition name (e.g., ceres, short, long)."
+    echo "-r RUNTIME        : SLURM walltime request (e.g., 04:00:00)."
+    echo "-m MEMORY         : Memory request for SLURM job (e.g., 16G)."
+    echo "-C THREADS        : Number of CPU cores to request for SLURM."
+    echo "-a ACCOUNT        : SLURM account/project (if needed)."
+    echo "-H MODE           : Analysis mode ('light' or 'heavy'). Default is light."
+    echo "-O OVERWRITE      : Set to true to overwrite previous results (default: false)."
+    echo "-h, --help        : Show this help message and exit."
 }
 # Parse argument (adapted)
 while [[ "$#" -gt 0 ]]; do
-case "$1" in
--t) TAXON_FILE="$2"; shift ;;
--g) GENE_FILE="$2"; shift ;;
--c) MIN_COVERAGE="$2"; shift ;;
--i) MIN_IDENTITY="$2"; shift ;;
--o) OUTPUT_FILE="$2"; shift ;;
--p) hpc="$2"; shift ;;
--q) queue="$2"; shift ;;
--r) runtime="$2"; shift ;;
--m) hpcmem="$2"; shift ;;
--C) hpcthreads="$2"; shift ;;
--a) account="$2"; shift ;;
--H) MODE="$2"; shift ;;
--O) OVERWRITE="$2"; shift ;;
--d) DOWNLOAD_FILE="$2"; shift ;;
--h|--help) usage; exit 0 ;;
-*) echo "Invalid option: $1"; usage; exit 1 ;;
-esac
-shift
-done 
+    case "$1" in
+        -g) GENE_FILE="$2"; shift ;;
+        -t) TAXON_FILE="$2"; shift ;;
+        -d) DOWNLOAD_FILE="$2"; shift ;;
+        -c) MIN_COVERAGE="$2"; shift ;;
+        -i) MIN_IDENTITY="$2"; shift ;;
+        -o) OUTPUT_FILE="$2"; shift ;;
+        -p) hpc="$2"; shift ;;
+        -q) queue="$2"; shift ;;
+        -r) runtime="$2"; shift ;;
+        -m) hpcmem="$2"; shift ;;
+        -C) hpcthreads="$2"; shift ;;
+        -a) account="$2"; shift ;;
+        -H) MODE="$2"; shift ;;
+        -O) OVERWRITE="$2"; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Invalid option: $1"; usage; exit 1 ;;
+    esac
+    shift
+done
 
 #adapted from GEAbash_v1.0.0; seems to be working as expected
 #while getopts ':g:t::c::i::o::p::q::r::m::C::a::H::O::h::' flag; do
