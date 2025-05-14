@@ -46,26 +46,26 @@ usage() {
 # Parse argument (adapted)
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
-        -g) GENE_FILE="$2"; shift ;;
-        -t) TAXON_FILE="$2"; shift ;;
-        -d) DOWNLOAD_FILE="$2"; shift ;;
-        -c) MIN_COVERAGE="$2"; shift ;;
-        -i) MIN_IDENTITY="$2"; shift ;;
-        -o) OUTPUT_FILE="$2"; shift ;;
-        -p) hpc="$2"; shift ;;
-        -q) queue="$2"; shift ;;
-        -r) runtime="$2"; shift ;;
-        -m) hpcmem="$2"; shift ;;
-        -C) hpcthreads="$2"; shift ;;
-        -a) account="$2"; shift ;;
-        -H) MODE="$2"; shift ;;
-        -O) OVERWRITE="$2"; shift ;;
+        -g) GENE_FILE="$2"; shift 2 ;;
+        -t) TAXON_FILE="$2"; shift 2 ;;
+        -d) DOWNLOAD_FILE="$2"; shift 2 ;;
+        -c) MIN_COVERAGE="$2"; shift 2 ;;
+        -i) MIN_IDENTITY="$2"; shift 2 ;;
+        -o) OUTPUT_FILE="$2"; shift 2 ;;
+        -p) hpc="$2"; shift 2 ;;
+        -q) queue="$2"; shift 2 ;;
+        -r) runtime="$2"; shift 2 ;;
+        -m) hpcmem="$2"; shift 2 ;;
+        -C) hpcthreads="$2"; shift 2 ;;
+        -a) account="$2"; shift 2 ;;
+        -H) MODE="$2"; shift 2 ;;
+        -O) OVERWRITE="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Invalid option: $1"; usage; exit 1 ;;
     esac
-    shift
 done
 
+echo "Debug: Download file is $DOWNLOAD_FILE"
 #adapted from GEAbash_v1.0.0; seems to be working as expected
 #while getopts ':g:t::c::i::o::p::q::r::m::C::a::H::O::h::' flag; do
 #  case "${flag}" in
