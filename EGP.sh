@@ -65,7 +65,6 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-echo "Debug: Download file is $DOWNLOAD_FILE"
 #adapted from GEAbash_v1.0.0; seems to be working as expected
 #while getopts ':g:t::c::i::o::p::q::r::m::C::a::H::O::h::' flag; do
 #  case "${flag}" in
@@ -73,7 +72,7 @@ echo "Debug: Download file is $DOWNLOAD_FILE"
 #    i) MIN_IDENTITY="${OPTARG}" ;;    o) OUTPUT_FILE="${OPTARG}" ;;    p) hpc="${OPTARG}" ;;
 #    q) queue="${OPTARG}" ;;    r) runtime="${OPTARG}" ;;    m) hpcmem="${OPTARG}" ;;
 #    C) hpcthreads="${OPTARG}" ;;    a) account="${OPTARG}" ;;    H) MODE="${OPTARG}" ;;
-#    O) OVERWRITE="${OPTARG}" ;;
+#    O) OVERWRITE="${OPTARG}" ;;     
 #    -h|--help) usage; exit 0 ;;
 #    *) echo "Invalid option: $1"; usage
 #       exit 1 ;;    esac; done
@@ -131,14 +130,14 @@ sed -i "s/hpctasks/$hpcthreads/g" sge2.sh #user
 #lines 214,221 assume -g -c -i -o -H -O -t in 
 #user supplied arguments to EGP or EGP defaults
 sed -i \
-'s%command%bash EGP.sh -g "${GENE_FILE}" -c "${MIN_COVERAGE}" -i "${MIN_IDENTITY}" -o "${OUTPUT_FILE}" -H "${MODE}" -O "${OVERWRITE}" -t "${TAXON_FILE}" -p T%g' \
+'s%command%bash EGP.sh -g "${GENE_FILE}" -c "${MIN_COVERAGE}" -i "${MIN_IDENTITY}" -o "${OUTPUT_FILE}" -H "${MODE}" -O "${OVERWRITE}" -t "${TAXON_FILE}" -d "${DOWNLOAD_FILE}" -p T%g' \
 sge2.sh
 #write the needed variables to the sge template
 #the last variable tells EGP that ${"hpc"} = T
 #so that this entire while loop will be skipped
 #by the EGP resubmission
 sed -i \
-"s%vars%OVERWRITE='$OVERWRITE'; GENE_FILE='$GENE_FILE'; MIN_COVERAGE='$MIN_COVERAGE'; MIN_IDENTITY='$MIN_IDENTITY'; OUTPUT_FILE='$OUTPUT_FILE'; MODE='$MODE'; TAXON_FILE='$TAXON_FILE'%g" \
+"s%vars%OVERWRITE='$OVERWRITE'; GENE_FILE='$GENE_FILE'; MIN_COVERAGE='$MIN_COVERAGE'; MIN_IDENTITY='$MIN_IDENTITY'; OUTPUT_FILE='$OUTPUT_FILE'; MODE='$MODE'; TAXON_FILE='$TAXON_FILE'; DOWNLOAD_FILE='$DOWNLOAD_FILE'%g" \
 sge2.sh
 
 #make sure the user provided account is written to the template
@@ -167,14 +166,14 @@ sed -i "s/hpctasks/$hpcthreads/g" slurm2.sh #user
 sed -i 's/other/$other/g' slurm2.sh #local.
 #write the GEA command to the slurm template
 sed -i \
-'s%command%bash EGP.sh -g "${GENE_FILE}" -c "${MIN_COVERAGE}" -i "${MIN_IDENTITY}" -o "${OUTPUT_FILE}" -H "${MODE}" -O "${OVERWRITE}" -t "${TAXON_FILE}" -p T%g' \
+'s%command%bash EGP.sh -g "${GENE_FILE}" -c "${MIN_COVERAGE}" -i "${MIN_IDENTITY}" -o "${OUTPUT_FILE}" -H "${MODE}" -O "${OVERWRITE}" -t "${TAXON_FILE}" -d "${DOWNLOAD_FILE}" -p T%g' \
 slurm2.sh
 #write the needed variables to the slurm template
 #the last variable tells EGP that ${"hpc"} = T
 #so that this entire while loop will be skipped
 #by the EGP resubmission
 sed -i \
-"s%vars%OVERWRITE='$OVERWRITE'; GENE_FILE='$GENE_FILE'; MIN_COVERAGE='$MIN_COVERAGE'; MIN_IDENTITY='$MIN_IDENTITY'; OUTPUT_FILE='$OUTPUT_FILE'; MODE='$MODE'; TAXON_FILE='$TAXON_FILE'%g" \
+"s%vars%OVERWRITE='$OVERWRITE'; GENE_FILE='$GENE_FILE'; MIN_COVERAGE='$MIN_COVERAGE'; MIN_IDENTITY='$MIN_IDENTITY'; OUTPUT_FILE='$OUTPUT_FILE'; MODE='$MODE'; TAXON_FILE='$TAXON_FILE'; DOWNLOAD_FILE='$DOWNLOAD_FILE'%g" \
 slurm2.sh
 
 #make sure the user provided account is written to the template
@@ -231,19 +230,19 @@ mkdir -p "$BLAST_RESULT_DIR" "$FILTERED_BLAST_RESULT_DIR"
 source "${WORK_DIR}/function.sh" || { echo "Error sourcing function.sh". exit 1; }
 # Handle custom download if provided
 if [[ -n "$DOWNLOAD_FILE" ]]; then
-echo "Custom panel downloaded requested."
+echo "Custom panel download requested."
 GENOME_DIR="$CUSTOM_GENOMES_DIR"
-mkdir -p "$CUSTOM_GENOMES_DIR"
+mkdir -p "$GENOME_DIR"
+mkdir -p "$BLAST_DB_DIR"
+DOWNLOAD_FILE=$(echo "$DOWNLOAD_FILE" | tr -d '\r' | xargs)
 while IFS= read -r raw_line; do
 taxon=$(echo "$raw_line" | tr -d '\r')
 [[ -z "$taxon" ]] && continue
 if [[ "$taxon" =~ ^[A-Z][a-z]+$ ]]; then
-echo "Downloading genus: $taxon"
 download_genus "$taxon" "$GENOME_DIR"
 get_species_list "$taxon" "$GENOME_DIR"
 download_species "$taxon" "$GENOME_DIR"
 elif [[ "$taxon" =~ ^[A-Z][a-z]+\ [a-z]+$ ]]; then
-echo "Downloading species: $taxon"
 download_species "$taxon" "$GENOME_DIR"
 fi
 done < "$DOWNLOAD_FILE"
@@ -256,7 +255,6 @@ else
 GENOME_DIR=""
 echo "Default mode: using prebuilt BLAST database."
 fi
-
 # Set delimiter as a space
 if [[ -n "$TAXON_FILE" ]]; then
 if [[ ! -f "$TAXON_FILE" ]]; then
