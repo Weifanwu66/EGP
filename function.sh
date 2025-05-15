@@ -168,10 +168,9 @@ echo "Organizing genomes into unclassified directories and removing aggregated d
 
 function create_blastdb() {
 local INPUT_FASTA="$1"
-local DB_NAME="$2"
-echo "Creating BLAST database for $DB_NAME..."
-makeblastdb -in "$INPUT_FASTA" -dbtype nucl -out "${BLAST_DB_DIR}/${DB_NAME}"
-echo "BLAST database created for $DB_NAME at ${BLAST_DB_DIR}/${DB_NAME}"
+local DB_PATH="$2"
+makeblastdb -in "$INPUT_FASTA" -dbtype nucl -out "${DB_PATH}"
+echo "BLAST database created for ${DB_PATH}"
 }
 
 function build_blastdb() {
@@ -199,7 +198,7 @@ SUBSPECIES=$(basename "$SUBSPECIES_DIR")
 [[ "$SUBSPECIES" == "unclassified" ]] && continue
 SUBSPECIES_FASTA="${SUBSPECIES_DIR}/Salmonella_enterica_subsp_${SUBSPECIES}_all_genomes.fna"
 find "$SUBSPECIES_DIR" -type f -name "*_genomic.fna" -exec cat {} + > "$SUBSPECIES_FASTA"
-create_blastdb "$SUBSPECIES_FASTA" "Salmonella_enterica_subsp_${SUBSPECIES}"
+create_blastdb "$SUBSPECIES_FASTA" "${output_dir}/Salmonella_enterica_subsp_${SUBSPECIES}"
 if [[ "$SUBSPECIES" == "enterica" ]]; then
 find "$SUBSPECIES_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r SEROTYPE_DIR; do
 SEROTYPE=$(basename "$SEROTYPE_DIR")

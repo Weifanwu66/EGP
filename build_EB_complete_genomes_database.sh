@@ -10,13 +10,23 @@ source "${WORKDIR}/function.sh"
 # List of Enterobacteriaceae Genus used to build the database
 GENUS=("Escherichia" "Salmonella" "Shigella" "Klebsiella" "Enterobacter" "Cronobacter" "Citrobacter")
 echo "Downloading and organizing complete genomes"
-
-# --- Download genomes ---
+max_parallel_jobs=8
+# --- Download genomes in parallel ---
 for GENUS in "${GENUS[@]}"; do
+(
 download_genus "$GENUS" "$GENOME_DIR"
 get_species_list "$GENUS" "$GENOME_DIR"
 download_species "$GENUS" "$GENOME_DIR"
+) &
+# Limit parallel jobs
+while (( $(jobs -r | wc -l) >= max_parallel_jobs )); do
+sleep 1
 done
+done
+# Wait for all background jobs to complete
+wait
+
+# --- download Salmonella subspecies and serotypes (sequential) ---
 get_salmonella_subsp_list "$GENOME_DIR"
 download_salmonella_subsp "$GENOME_DIR"
 get_salmonella_serotype_list "$GENOME_DIR"

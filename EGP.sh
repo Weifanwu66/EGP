@@ -234,17 +234,32 @@ echo "Custom panel download requested."
 GENOME_DIR="$CUSTOM_GENOMES_DIR"
 mkdir -p "$GENOME_DIR"
 mkdir -p "$BLAST_DB_DIR"
-DOWNLOAD_FILE=$(echo "$DOWNLOAD_FILE" | tr -d '\r' | xargs)
-while IFS= read -r raw_line; do
+max_parallel_jobs=8
+while IFS= read -r raw_line || [ -n "$raw_line" ]; do
 taxon=$(echo "$raw_line" | tr -d '\r')
 [[ -z "$taxon" ]] && continue
+(
 if [[ "$taxon" =~ ^[A-Z][a-z]+$ ]]; then
+GENUS_DIR="${GENOME_DIR}/${taxon}"
+if [[ -d "$GENUS_DIR" ]]; then
+echo "[INFO] Genus $taxon already downloaded. Skipping."
+else
 download_genus "$taxon" "$GENOME_DIR"
 get_species_list "$taxon" "$GENOME_DIR"
 download_species "$taxon" "$GENOME_DIR"
+fi
 elif [[ "$taxon" =~ ^[A-Z][a-z]+\ [a-z]+$ ]]; then
+SPECIES_DIR="${GENOME_DIR}/${taxon// /_}"
+if [[ -d "$SPECIES_DIR" ]]; then
+echo "[INFO] Species $taxon already downloaded. Skipping."
+else
 download_species "$taxon" "$GENOME_DIR"
 fi
+fi
+) &
+while (( $(jobs -r | wc -l) >= max_parallel_jobs )); do
+sleep 1
+done
 done < "$DOWNLOAD_FILE"
 echo "Organizing unclassified genomes"
 move_unclassified_genomes "$GENOME_DIR"
