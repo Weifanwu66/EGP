@@ -178,7 +178,7 @@ bash EGP.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G
 ### 4. Custom Genome Panel — Heavy Mode
 
 ```bash
-bash EGP.sh -g test_gene.fasta -d download_taxon.txt -t test_taxon.txt -q ceres -r 12:00:00 -m 48G -C 24 -H heavy
+bash EGP.sh -g test_gene.fasta -d download_taxon.txt -t custom_test_taxon.txt -q ceres -r 12:00:00 -m 48G -C 24 -H heavy
 ```
 
 ### 5. Overwrite Previous Results
@@ -186,6 +186,15 @@ bash EGP.sh -g test_gene.fasta -d download_taxon.txt -t test_taxon.txt -q ceres 
 ```bash
 bash EGP.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -H light -O true
 ```
+
+### 6. Rebuild Default EB Database
+
+```bash
+bash build_EB_complete_genomes_database.sh
+```
+> ⚠️ This script downloads and formats the default Enterobacteriaceae database.  
+> It includes 7 genus: *Salmonella, Escherichia, Enterobacter, Klebsiella, Cronobacter, Citrobacter,* and *Shigella*.  
+> **⚠️ Note:** Rebuilding the database requires **at least 1.4 terabytes of storage**. Make sure you have adequate disk space before running this step.
 
 ---
 
