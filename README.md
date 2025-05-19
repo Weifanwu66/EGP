@@ -101,8 +101,8 @@ Built‑in SLURM support enables:
 #### Example SLURM submission (automatic through EGP)
 
 ```bash
-# Run light mode using custom database on SCINet (partition ceres, 8 CPUs, 16 GB RAM, 4 hours max)
-bash EGP.sh -g genes.fasta -d download_taxon.txt -q ceres -C 8 -m 16G -r 04:00:00 -H light
+# Run default light mode using custom database on SCINet (partition ceres, 8 CPUs, 16 GB RAM, 4 hours max)
+bash EGP.sh -g genes.fasta -d download_taxon.txt -q ceres -C 8 -m 16G -r 04:00:00
 ```
 
 ### SLURM Parameters Exposed in EGP
@@ -157,7 +157,7 @@ conda install -c bioconda <package_name>
 -----
 
 ## Example commands:
-### 1. Run Light Mode (default mode) with Pre-built Database with 95% of identity and 90% of coverage (Default 7 Enterobacteriaceae Genus; no target (-t) is defined, so the pipeline will loop through all taxonomic group available in pre-built database)
+### 1. Run default Light Mode with Pre-built Database with 95% of identity and 90% of coverage (no target (-t) is defined, so the pipeline will loop through all taxonomic group available in pre-built database)
 
 ```bash
 bash EGP.sh -g test_gene.fasta -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
