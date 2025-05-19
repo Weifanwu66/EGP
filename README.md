@@ -204,7 +204,7 @@ bash build_EB_complete_genomes_database.sh
 - `-d` (custom genus panel file) is used to download genera outside the default Enterobacteriaceae set.
 - Ensure requested memory (`-m`) and runtime (`-r`) are appropriate for your HPC environment.
 - Building custom databases with `-d` should be performed on nodes with ≥250 GB available disk space.
-- ** Test input files (`test_gene.fasta`, `test_taxon.txt`, and `download_taxon.txt`) can be found in the `test/` directory.**
+- Test input files (`test_gene.fasta`, `test_taxon.txt`, `download_taxon.txt`, and `custom_test_taxon.txt`) can be found in the `test/` directory.
 ---
 
 ## Output
