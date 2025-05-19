@@ -157,13 +157,13 @@ conda install -c bioconda <package_name>
 -----
 
 ## Example commands:
-### 1. Run Light Mode with Pre-built Database (Default 7 Enterobacteriaceae Genera)
+### 1. Run Light Mode with Pre-built Database with 95% of identity and 90% of coverage (Default 7 Enterobacteriaceae Genus; no target (-t) is defined, so the pipeline will loop through all taxonomic group available in pre-built database)
 
 ```bash
-bash EGP.sh -g test_gene.fasta -q ceres -r 04:00:00 -m 16G -C 8 -H light
+bash EGP.sh -g test_gene.fasta -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
 ```
 
-### 2. Run Heavy Mode with Pre-built Database (Default 7 Enterobacteriaceae Genera)
+### 2. Run Heavy Mode with Pre-built Database (Default 7 Enterobacteriaceae Genus)
 
 ```bash
 bash EGP.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 16 -H heavy
@@ -172,7 +172,7 @@ bash EGP.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 
 ### 3. Custom Genome Panel — Light Mode
 
 ```bash
-bash EGP.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12 -H light
+bash EGP.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12
 ```
 
 ### 4. Custom Genome Panel — Heavy Mode
@@ -184,7 +184,7 @@ bash EGP.sh -g test_gene.fasta -d download_taxon.txt -t custom_test_taxon.txt -q
 ### 5. Overwrite Previous Results
 
 ```bash
-bash EGP.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -H light -O true
+bash EGP.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -O true
 ```
 
 ### 6. Rebuild Default EB Database
