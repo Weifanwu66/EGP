@@ -1,4 +1,4 @@
-# Gene Prevalence Estimation Tool for Bacterial Taxonomic Groups
+# Gene Taxonomic Prevalence Estimation Tool for Bacterial Taxonomic Groups
 
 ## Overview
 This tool is designed for estimating the prevalence of specific genes in bacterial taxa, integrating NCBI genome retrieval, BLAST database construction, and automated query analysis.
