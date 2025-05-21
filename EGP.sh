@@ -342,6 +342,9 @@ echo "Finished processing complete genomes for $taxon"
 
 process_draft_genomes() {
 local taxon="$1"
+local clean_taxon="$(extract_taxon_info "$taxon")"
+local blast_db_name="${clean_taxon// /_}"
+blast_db_name="${blast_db_name//./}"
 local total_draft_genomes=$(get_total_genomes_count "$taxon" "contig")
 read -r sample_size iterations <<< "$(calculate_sample_size_and_iterations "$total_draft_genomes")"
 echo "Processing $taxon | Total draft genomes: $total_draft_genomes. Running $iterations iterations (max 20)."
@@ -349,9 +352,6 @@ for ((i=1; i<=iterations; i++)); do
 echo "Starting iterations $i/$iterations for $taxon"
 download_random_draft_genomes "$taxon" "$sample_size" "$DRAFT_GENOMES_DIR" "$i"
 perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$DRAFT_BLAST_RESULT_DIR" "$i" "$taxon"
-local clean_taxon="$(extract_taxon_info "$taxon")"
-local blast_db_name="${clean_taxon// /_}"
-blast_db_name="${blast_db_name//./}"
 mkdir -p "${DRAFT_BLAST_RESULT_DIR}"
 local blast_result_file="${DRAFT_BLAST_RESULT_DIR}/${blast_db_name}/iteration_${i}_draft_blast_results.txt"
 filter_blast_results "$blast_result_file" "$FILTERED_DRAFT_BLAST_RESULT_DIR" "$MIN_COVERAGE" "draft"
