@@ -239,10 +239,30 @@ while IFS= read -r raw_line || [ -n "$raw_line" ]; do
 taxon=$(echo "$raw_line" | tr -d '\r')
 [[ -z "$taxon" ]] && continue
 (
-if [[ "$taxon" =~ ^[A-Z][a-z]+$ ]]; then
+if [[ "$taxon" == "Salmonella" || "$taxon" == "Salmonella enterica" ]]; then
+echo "$taxon detected. Downloading all subspecies and serotypes."
+get_salmonella_subsp_list "$GENOME_DIR"
+download_salmonella_subsp "$GENOME_DIR"
+get_salmonella_serotype_list "$GENOME_DIR"
+download_salmonella_serotype "$GENOME_DIR"
+elif [[ "$taxon" == "Salmonella enterica subsp. enterica" ]]; then
+echo "Downloading all serotypes under 'Salmonella enterica subsp. enterica'"
+get_salmonella_serotype_list "$GENOME_DIR"
+download_salmonella_serotype "$GENOME_DIR"
+elif [[ "$taxon" =~ ^Salmonella\ enterica\ subsp\.?\ enterica\ serovar\ ([A-Za-z0-9_]+)$ || "$taxon" =~ ^Salmonella\ ([A-Z][a-zA-Z0-9_]+)$ ]]; then
+if [[ "$taxon" =~ ^Salmonella\ enterica\ subsp\.?\ enterica\ serovar\ ([A-Za-z0-9_]+)$ ]]; then
+serotype="${BASH_REMATCH[1]}"
+echo "Downloading $serotype"
+else
+[[ "$taxon" =~ ^Salmonella\ ([A-Z][a-zA-Z0-9_]+)$ ]]
+serotype="${BASH_REMATCH[1]}"
+echo "Downloading $serotype"
+fi
+download_single_serotype "$serotype"
+elif [[ "$taxon" =~ ^[A-Z][a-z]+$ ]]; then
 GENUS_DIR="${GENOME_DIR}/${taxon}"
 if [[ -d "$GENUS_DIR" ]]; then
-echo "[INFO] Genus $taxon already downloaded. Skipping."
+echo "Genus $taxon already downloaded. Skipping."
 else
 download_genus "$taxon" "$GENOME_DIR"
 get_species_list "$taxon" "$GENOME_DIR"
@@ -251,7 +271,7 @@ fi
 elif [[ "$taxon" =~ ^[A-Z][a-z]+\ [a-z]+$ ]]; then
 SPECIES_DIR="${GENOME_DIR}/${taxon// /_}"
 if [[ -d "$SPECIES_DIR" ]]; then
-echo "[INFO] Species $taxon already downloaded. Skipping."
+echo "Species $taxon already downloaded. Skipping."
 else
 download_species "$taxon" "$GENOME_DIR"
 fi
@@ -290,7 +310,7 @@ gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
 genus = $1
 species_or_serotype = ($2 != "") ? $2 : ""
 if (genus !~ /^(Salmonella|Escherichia|Citrobacter|Enterobacter|Klebsiella|Shigella|Cronobacter)$/) {
-print "Error: Invalid genus in taxon file. Allowed: Salmonella, Escherichia, Citrobacter, Enterobacter, Klebsiella, Shigella, Cronobacter."
+print "Error: Invalid genus in taxon file. Allowed: Salmonella, Escherichia, Citrobacter, Enterobacter, Klebsiella, Shigella, Cronobacter in default. To proceed with other genus, use custom panel flag -d."
 print "Your line:", $0
 exit 1 
 }
@@ -328,7 +348,7 @@ echo "Processing $taxon | Total draft genomes: $total_draft_genomes. Running $it
 for ((i=1; i<=iterations; i++)); do
 echo "Starting iterations $i/$iterations for $taxon"
 download_random_draft_genomes "$taxon" "$sample_size" "$DRAFT_GENOMES_DIR" "$i"
-perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$DRAFT_BLAST_RESULT_DIR" "$i" ""
+perform_blast "$GENE_FILE" "$MIN_IDENTITY" "$DRAFT_BLAST_RESULT_DIR" "$i" "$taxon"
 local clean_taxon="$(extract_taxon_info "$taxon")"
 local blast_db_name="${clean_taxon// /_}"
 blast_db_name="${blast_db_name//./}"

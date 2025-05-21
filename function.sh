@@ -140,6 +140,22 @@ fi
 done < "$MONOPHASIC_TYPHIMURIUM_LIST"
 }
 
+function download_single_serotype() {
+local serotype="$1"
+local output_dir="${GENOME_DIR}/Salmonella/Salmonella_enterica/enterica/${serotype}"
+echo "Downloading genomes for Salmonella $serotype..."
+mkdir -p "$output_dir"
+ncbi-genome-download bacteria --genera "Salmonella enterica subsp. enterica serovar $serotype" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$output_dir" --verbose
+if [[ -d "$output_dir/genbank" ]]; then
+find "$output_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$1" && mv "${1%.gz}" "'"$output_dir"'"' _ {} \;
+rm -rf "$output_dir/genbank"
+fi
+if [[ -z "$(find "$output_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
+echo "No genomes found for $subspecies. Remove empty directory."
+rm -rf "$output_dir"
+fi
+}
+
 function move_unclassified_genomes() {
 local output_dir="$1"
 find "$output_dir" -mindepth 1 -type d | while read -r level_dir; do
@@ -310,28 +326,33 @@ local query_gene="$1"
 local perc_identity="$2"
 local output_dir="$3"
 local iteration="$4" # only used for draft genomes
-local taxon_file="$5"  # only provide for complete genomes, always empty for draft genomes
+local taxon="$5"
 if [[ -n "$iteration" ]]; then
-echo "Processing draft genomes for iteration $iteration"
-local taxon_dirs=("${DRAFT_GENOMES_DIR}"/*/)
-local taxon=$(basename "${taxon_dirs[0]%/}")
-local genome_dir="${DRAFT_GENOMES_DIR}/${taxon}/genomes_${iteration}"
-local blast_db="${DRAFT_BLAST_DB_DIR}/${taxon}/iteration_${iteration}"
+echo "Processing draft genomes for iteration $iteration: $taxon"
+local standard_taxon="$(extract_taxon_info "$taxon")"
+local safe_taxon="${standard_taxon// /_}"
+safe_taxon="${safe_taxon//./}"
+local genome_dir="${DRAFT_GENOMES_DIR}/${safe_taxon}/genomes_${iteration}"
+local blast_db="${DRAFT_BLAST_DB_DIR}/${safe_taxon}/iteration_${iteration}"
 mkdir -p "$(dirname "$blast_db")"
 if [ ! -d "$genome_dir" ] || [ -z "$(find "$genome_dir" -type f -name "*_genomic.fna" 2>/dev/null)" ]; then
 echo "Error: No genomic.fna files found in $genome_dir. Check download process." >&2
 exit 1
 fi
 local concatenated_genome="${genome_dir}/combined.fna"
+echo "Concatenating genome FASTAs for $taxon..."
 find "$genome_dir" -name "*_genomic.fna" -exec cat {} + > "$concatenated_genome"
+echo "Building BLAST DB for $taxon..."
 makeblastdb -in "$concatenated_genome" -dbtype nucl -out "$blast_db"
 local blast_output="${output_dir}/${taxon}/iteration_${iteration}_draft_blast_results.txt"
 mkdir -p "$(dirname "$blast_output")"
-blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity" -max_target_seqs 7000
+echo "Running BLAST for $taxon..."
+blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen" \
+-perc_identity "$perc_identity" -max_target_seqs 7000
 echo "BLAST results saved to: $blast_output"
 else
 # Skip empty lines
-[[ -z "$taxon" ]] && continue
+[[ -z "$taxon" ]] && return
 local blast_db_name="${taxon// /_}"
 blast_db_name="${blast_db_name//./}"
 local blast_db="${BLAST_DB_DIR}/${blast_db_name}"
@@ -339,7 +360,8 @@ local clean_taxon="$(extract_taxon_info "$taxon")"
 local blast_output_name="${clean_taxon// /_}"
 blast_output_name="${blast_output_name//./}"
 local blast_output="${output_dir}/${blast_output_name}_complete_blast_results.txt"
-blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt 6 -perc_identity "$perc_identity" -max_target_seqs 7000
+blastn -query "$query_gene" -db "$blast_db" -out "$blast_output" -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen" \
+-perc_identity "$perc_identity" -max_target_seqs 7000
 echo "BLAST results saved to $blast_output"
 fi
 echo "BLAST analysis completed. Results saved in: $output_dir"
@@ -356,11 +378,11 @@ local taxon="$(basename "$(dirname "$blast_result_file")")"
 local iteration="$(grep -o '[0-9]\+' <<< "$base_name")"
 local filtered_result="${output_dir}/${taxon}/filtered_iteration_${iteration}_draft_blast_results.txt"
 mkdir -p "$(dirname "$filtered_result")"
-awk -v cov="$coverage_threshold" '(($4/($8 - $7 + 1)*100) >= cov) {print $0}' "$blast_result_file" > "$filtered_result"
+awk -v cov="$coverage_threshold" '($13 > 0) && (($4 / $13 * 100) >= cov) {print $0}' "$blast_result_file" > "$filtered_result"
 echo "Filtered BLAST results for draft genomes are saved to $filtered_result"
 else
 local filtered_result="$output_dir/filtered_${base_name}"
-awk -v cov="$coverage_threshold" '(($4/($8 - $7 + 1)*100) >= cov) {print $0}' "$blast_result_file" > "$filtered_result"
+awk -v cov="$coverage_threshold" '($13 > 0) && (($4 / $13 * 100) >= cov) {print $0}' "$blast_result_file" > "$filtered_result"
 echo "Filtered BLAST results for complete genomes are saved to $filtered_result"
 fi
 }
