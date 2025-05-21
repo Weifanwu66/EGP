@@ -1,12 +1,12 @@
-# Gene Prevalence Estimation Tool for Enterobacteriaceae
+# Gene Prevalence Estimation Tool for Bacterial Taxonomic Groups
 
 ## Overview
-This tool is designed for estimating the prevalence of a specific gene in Enterobacteriaceae taxa, integrating NCBI genome retrieval, BLAST database construction, and automated query analysis.
+This tool is designed for estimating the prevalence of specific genes in bacterial taxa, integrating NCBI genome retrieval, BLAST database construction, and automated query analysis.
 
 ## Features
 ### Genomic Data Acquisition
 * **Storage‑friendly metadata:** Because of the large storage requirements, genome sequence files used to build the BLAST database are **not** stored in this repository. Instead, `database/metadata` holds the assembly‑accession lists so users can re‑download any sequence on demand.  
-* **Pre‑built complete‑genome database:** A BLAST database built from complete genomes of the default seven Enterobacteriaceae genera is provided for quick, high‑quality searches.  
+* **Pre‑built complete‑genome database:** A BLAST database built from complete genomes of the default seven Enterobacteriaceae genus is provided for quick, high‑quality searches and hosted on USDA Ag Data Commons. The script `build_EB_complete_genomes_database.sh` is also provided for reproducing or updating the default database. 
 * **Heavy mode (`‑H heavy` + `‑t <taxon_file>`):** Adds draft genomes to the analysis. Draft assemblies for each target taxon are downloaded with *ncbi‑genome‑download*, shuffled, and sampled in iterations (Cochran’s formula with finite‑population correction; ≤ 20 iterations) to capture diversity while keeping runtime reasonable.  
 * **Custom genome panel (`‑d <download_file>`):** Lets users work **outside** the default Enterobacteriaceae genus. Supply a text file (one genus per line) and the pipeline will download the corresponding **complete genomes**, build a bespoke BLAST database in real time, and then run either LIGHT or HEAVY mode against that database.
 
