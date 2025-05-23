@@ -1,4 +1,4 @@
-name: EGP
+name: getprev
 channels:
  - bioconda
  - conda-forge
