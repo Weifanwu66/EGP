@@ -87,7 +87,7 @@ The script to download complete genomes and their corresponding BLAST DB is buil
 
 ### SLURM Integration
 
-EGP is designed to run efficiently on high‑performance computing (HPC) systems managed by **SLURM** workload managers.
+GeTPrev is designed to run efficiently on high‑performance computing (HPC) systems managed by **SLURM** workload managers.
 
 Built‑in SLURM support enables:
 
@@ -129,14 +129,14 @@ scontrol show job <jobID>
 To run this pipeline, set up a Conda environment with the required dependencies.
 1. Clone the Repository
 ```sh
-git clone https://github.com/Weifanwu66/EGP.git
-cd EGP
+git clone https://github.com/Weifanwu66/GeTPrev.git
+cd GeTPrev
 ```
 2. Create and Activate the Conda Environment
 The pipeline requires a Conda environment with all necessary dependencies. To create and activate it, run:
 ```sh
 conda env create -f environment.yml
-conda activate EGP
+conda activate GeTPrev
 ```
 To verify the installation, check if all tools are installed:
 ```sh
@@ -160,37 +160,37 @@ conda install -c bioconda <package_name>
 ### 1. Run default light mode with 95% of identity and 90% of coverage (no target (-t) is defined, so the pipeline will loop through all taxonomic group available in pre-built database)
 
 ```bash
-bash EGP.sh -g test_gene.fasta -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
+bash GeTPrev.sh -g test_gene.fasta -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
 ```
 
 ### 2. Run with a single taxon target in light mode
 
 ```bash
-bash EGP.sh -g test_gene.fasta -t "Salmonella" -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
+bash GeTPrev.sh -g test_gene.fasta -t "Salmonella" -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
 ```
 
 ### 3. Run heavy mode with multiple targets listed in a text file
 
 ```bash
-bash EGP.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 16 -H heavy
+bash GeTPrev.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 16 -H heavy
 ```
 
 ### 4. Custom genome panel — light mode
 
 ```bash
-bash EGP.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12
+bash GeTPrev.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12
 ```
 
 ### 5. Custom genome panel — heavy mode
 
 ```bash
-bash EGP.sh -g test_gene.fasta -d download_taxon.txt -t custom_test_taxon.txt -q ceres -r 12:00:00 -m 48G -C 24 -H heavy
+bash GeTPrev.sh -g test_gene.fasta -d download_taxon.txt -t custom_test_taxon.txt -q ceres -r 12:00:00 -m 48G -C 24 -H heavy
 ```
 
 ### 6. Overwrite previous results
 
 ```bash
-bash EGP.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -O true
+bash GeTPrev.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -O true
 ```
 
 ### 7. Rebuild default EB database
