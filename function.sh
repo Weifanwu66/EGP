@@ -34,18 +34,36 @@ function download_species() {
 local target_genus="$1"
 local output_dir="$2"
 local species_list_file="${output_dir}/species_list.txt"
+# Detect available CPU cores
+local total_cpus
+if [[ -n "${SLURM_CPUS_ON_NODE:-}" ]]; then
+total_cpus=$SLURM_CPUS_ON_NODE
+else
+total_cpus=$(nproc)
+fi
+# Throttle species-level jobs
+local max_parallel_species
+local cores_half=$(( total_cpus / 2 ))
+if (( cores_half < 1 )); then
+max_parallel_species=1
+elif (( cores_half > 4 )); then
+max_parallel_species=4
+else
+max_parallel_species=$core_half
+fi
 while read -r SPECIES; do
 local genus=$(echo "$SPECIES" | awk '{print $1}')
 if [[ "$genus" != "$target_genus" ]]; then
 continue
 fi
+(
 local clean_species=$(echo "$SPECIES" | sed 's/ /_/g')
 local species_dir="${output_dir}/${genus}/${clean_species}"
 [[ "$SPECIES" == "Salmonella enterica" ]] && species_dir="$species_dir/aggregated"
 mkdir -p "$species_dir"
 if [[ -n "$(find "$species_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
 echo "Genomes already exist for $SPECIES, skipping donwloading"
-continue
+exit 0
 fi
 echo "Downloading genomes for $SPECIES"
 ncbi-genome-download bacteria --genera "$SPECIES" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$species_dir" --verbose
@@ -58,9 +76,15 @@ if [[ -z "$(find "$species_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev
 echo "No genomes found for $SPECIES. Remove empty directory."
 rm -rf "$species_dir"
 fi
+) &
+while (( $(jobs -r | wc -l) >= max_parallel_species )); do
+sleep 1
+done
 done < "$species_list_file"
+wait
 echo "Downloaded and organized species genomes for $target_genus"
 }
+
 # Build a function to get all subspecies names under Salmonella enterica
 function get_salmonella_subsp_list() {
 local output_dir="$1"
