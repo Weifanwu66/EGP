@@ -91,7 +91,7 @@ GeTPrev is designed to run efficiently on high‑performance computing (HPC) sys
 
 Built‑in SLURM support enables:
 
-* **Automatic job submission**: EGP can generate SLURM batch scripts internally when queues (`‑q`), resources (`‑m`, `‑r`), and node constraints are specified.
+* **Automatic job submission**: GeTPrev can generate SLURM batch scripts internally when queues (`‑q`), resources (`‑m`, `‑r`), and node constraints are specified.
 * **Flexible resource requests**: Users can control memory, CPU cores, wall‑time, and partition selection through command‑line options.
 * **Robust parallelism**: Multiple `blastn` processes and download threads are automatically parallelized across available CPUs.
 * **Queue compatibility**: Tested on partitions like `ceres`, `short`, and `long` on SCINet clusters (Ceres, Atlas).
@@ -102,7 +102,7 @@ Built‑in SLURM support enables:
 
 ```bash
 # Run default light mode using custom database on SCINet (partition ceres, 8 CPUs, 16 GB RAM, 4 hours max)
-bash EGP.sh -g genes.fasta -d download_taxon.txt -q ceres -C 8 -m 16G -r 04:00:00
+bash getprev.sh -g genes.fasta -d download_taxon.txt -q ceres -C 8 -m 16G -r 04:00:00
 ```
 
 ### SLURM Parameters Exposed in EGP
@@ -129,14 +129,14 @@ scontrol show job <jobID>
 To run this pipeline, set up a Conda environment with the required dependencies.
 1. Clone the Repository
 ```sh
-git clone https://github.com/Weifanwu66/GeTPrev.git
-cd GeTPrev
+git clone https://github.com/Weifanwu66/GeTPrev.git getprev
+cd getprev
 ```
 2. Create and Activate the Conda Environment
 The pipeline requires a Conda environment with all necessary dependencies. To create and activate it, run:
 ```sh
 conda env create -f environment.yml
-conda activate GeTPrev
+conda activate getprev
 ```
 To verify the installation, check if all tools are installed:
 ```sh
@@ -160,37 +160,37 @@ conda install -c bioconda <package_name>
 ### 1. Run default light mode with 95% of identity and 90% of coverage (no target (-t) is defined, so the pipeline will loop through all taxonomic group available in pre-built database)
 
 ```bash
-bash GeTPrev.sh -g test_gene.fasta -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
+bash getprev.sh -g test_gene.fasta -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
 ```
 
 ### 2. Run with a single taxon target in light mode
 
 ```bash
-bash GeTPrev.sh -g test_gene.fasta -t "Salmonella" -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
+bash getprev.sh -g test_gene.fasta -t "Salmonella" -i 95 -c 90 -q ceres -r 04:00:00 -m 16G -C 8
 ```
 
 ### 3. Run heavy mode with multiple targets listed in a text file
 
 ```bash
-bash GeTPrev.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 16 -H heavy
+bash getprev.sh -g test_gene.fasta -t test_taxon.txt -q ceres -r 08:00:00 -m 32G -C 16 -H heavy
 ```
 
 ### 4. Custom genome panel — light mode
 
 ```bash
-bash GeTPrev.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12
+bash getprev.sh -g test_gene.fasta -d download_taxon.txt -q ceres -r 06:00:00 -m 24G -C 12
 ```
 
 ### 5. Custom genome panel — heavy mode
 
 ```bash
-bash GeTPrev.sh -g test_gene.fasta -d download_taxon.txt -t custom_test_taxon.txt -q ceres -r 12:00:00 -m 48G -C 24 -H heavy
+bash getprev.sh -g test_gene.fasta -d download_taxon.txt -t custom_test_taxon.txt -q ceres -r 12:00:00 -m 48G -C 24 -H heavy
 ```
 
 ### 6. Overwrite previous results
 
 ```bash
-bash GeTPrev.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -O true
+bash getprev.sh -g test_gene.fasta -q ceres -r 02:00:00 -m 8G -C 4 -O true
 ```
 
 ### 7. Rebuild default EB database
