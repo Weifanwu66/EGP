@@ -18,25 +18,9 @@ MONOPHASIC_TYPHIMURIUM_LIST="$DATABASE_DIR/monophasic_Typhimurium_list.txt"
 mkdir -p "$GENOME_DIR"
 mkdir -p "$BLAST_DB_DIR"
 > "$FAILED_FLAG"
-# Load all required functions
+
 source "${WORKDIR}/function.sh"
-
-# ============================
-# Dynamic throttling based on available CPU cores
-# ============================
-if [[ -n "${SLURM_CPUS_ON_NODE:-}" ]]; then
-TOTAL_CPUS=$SLURM_CPUS_ON_NODE
-else
-TOTAL_CPUS=$(nproc)
-fi
-
-# Static limits
-max_parallel_genus=6
-max_parallel_serotypes=6
-
-echo "Detected $TOTAL_CPUS logical cores, parallel limits:"
-echo " - Genus: $max_parallel_genus; - Species: $max_parallel_species; -Serotypes: $max_parallel_serotypes"
-
+TOTAL_CPUS=$(get_cpus)
 # ============================
 # Step 1: Download genus and species in parallel
 # ============================
@@ -59,7 +43,7 @@ if ! download_species "$GENUS" "$GENOME_DIR"; then
 echo "Failed to download species under genus: $GENUS" >> "$FAILED_FLAG"
 fi
 ) &
-while (( $(jobs -r | wc -l) >= max_parallel_genus )); do
+while (( $(jobs -r | wc -l) >= 6 )); do
 sleep 1
 done
 done
@@ -69,23 +53,25 @@ wait
 # ============================
 # Step 2: Download Salmonella subspecies (sequential) and serotypes in parallel
 # ============================
-echo "Starting Salmonella subspecies download"
+echo "Starting Salmonella subspecies and serotype download"
 if ! get_salmonella_subsp_list "$GENOME_DIR"; then
 echo "Failed to get Salmonella subspecies list" >> "$FAILED_FLAG"
+exit 1
 fi
 
 if ! download_salmonella_subsp "$GENOME_DIR"; then
 echo "Failed to download Salmonella subspecies" >> "$FAILED_FLAG"
+exit 1
 fi
-
-echo "Starting downloading Salmonella serotypes in parallel"
 
 if ! get_salmonella_serotype_list "$GENOME_DIR"; then
 echo "Failed to get Salmonella serotype list" >> "$FAILED_FLAG"
+exit 1
 fi
 
 if ! download_salmonella_serotype "$GENOME_DIR"; then
 echo "Failed to download Salmonella serotypes" >> "$FAILED_FLAG"
+exit 1
 fi
 
 # ============================

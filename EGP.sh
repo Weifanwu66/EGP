@@ -7,6 +7,8 @@ WORK_DIR=$(pwd)
 TAXON_FILE=""
 GENE_FILE=""
 DOWNLOAD_FILE=""
+FAILED_FLAG="${WORK_DIR}/build_custom_db_failed.flag"
+> "$FAILED_FLAG"
 OUTPUT_FILE="${WORK_DIR}/result/gene_summary.csv"
 DATABASE_DIR="${WORK_DIR}/database"
 BLAST_DB_DIR="${DATABASE_DIR}/complete_blast_db"
@@ -241,39 +243,57 @@ taxon=$(echo "$raw_line" | tr -d '\r')
 (
 if [[ "$taxon" == "Salmonella" || "$taxon" == "Salmonella enterica" ]]; then
 echo "$taxon detected. Downloading all subspecies and serotypes."
-get_salmonella_subsp_list "$GENOME_DIR"
-download_salmonella_subsp "$GENOME_DIR"
-get_salmonella_serotype_list "$GENOME_DIR"
-download_salmonella_serotype "$GENOME_DIR"
+if ! get_salmonella_subsp_list "$GENOME_DIR"; then
+echo "Failed to get Salmonella subspecies list" >> "$FAILED_FLAG"; exit 1
+fi
+if ! download_salmonella_subsp "$GENOME_DIR"; then
+echo "Failed to download Salmonella subspecies" >> "$FAILED_FLAG"; exit 1
+fi
+if ! get_salmonella_serotype_list "$GENOME_DIR"; then
+echo "Failed to get Salmonella serotype list" >> "$FAILED_FLAG"; exit 1
+fi
+if ! download_salmonella_serotype "$GENOME_DIR"; then
+echo "Failed to download Salmonella serotypes" >> "$FAILED_FLAG"; exit 1
+fi
 elif [[ "$taxon" == "Salmonella enterica subsp. enterica" ]]; then
 echo "Downloading all serotypes under 'Salmonella enterica subsp. enterica'"
-get_salmonella_serotype_list "$GENOME_DIR"
-download_salmonella_serotype "$GENOME_DIR"
-elif [[ "$taxon" =~ ^Salmonella\ enterica\ subsp\.?\ enterica\ serovar\ ([A-Za-z0-9_]+)$ || "$taxon" =~ ^Salmonella\ ([A-Z][a-zA-Z0-9_]+)$ ]]; then
-if [[ "$taxon" =~ ^Salmonella\ enterica\ subsp\.?\ enterica\ serovar\ ([A-Za-z0-9_]+)$ ]]; then
-serotype="${BASH_REMATCH[1]}"
-echo "Downloading $serotype"
-else
-[[ "$taxon" =~ ^Salmonella\ ([A-Z][a-zA-Z0-9_]+)$ ]]
-serotype="${BASH_REMATCH[1]}"
-echo "Downloading $serotype"
+if ! get_salmonella_serotype_list "$GENOME_DIR"; then
+echo "Failed to get serotype list" >> "$FAILED_FLAG"; exit 1
 fi
-download_single_serotype "$serotype"
+if ! download_salmonella_serotype "$GENOME_DIR"; then
+echo "Failed to download serotypes" >> "$FAILED_FLAG"; exit 1
+fi
+elif [[ "$taxon" =~ ^Salmonella( enterica subsp\.?\ enterica serovar)? ([A-Z][a-zA-Z0-9_]+)$ ]]; then
+serotype="${BASH_REMATCH[1]}"
+echo "Downloading $serotype"
+echo "$serotype" > "$GENOME_DIR/temp_serotype_list.txt"
+if ! download_salmonella_serotype "$GENOME_DIR" "$GENOME_DIR/temp_serotype_list.txt"; then
+echo "Failed to download serotype: $serotype" >> "$FAILED_FLAG"
+fi
+rm -f "$GENOME_DIR/temp_serotype_list.txt"
 elif [[ "$taxon" =~ ^[A-Z][a-z]+$ ]]; then
 GENUS_DIR="${GENOME_DIR}/${taxon}"
 if [[ -d "$GENUS_DIR" ]]; then
 echo "Genus $taxon already downloaded. Skipping."
 else
-download_genus "$taxon" "$GENOME_DIR"
-get_species_list "$taxon" "$GENOME_DIR"
-download_species "$taxon" "$GENOME_DIR"
+if ! download_genus "$taxon" "$GENOME_DIR"; then
+echo "Failed to download genus: $taxon" >> "$FAILED_FLAG"; exit 1
+fi
+if ! get_species_list "$taxon" "$GENOME_DIR"; then
+echo "Failed to get species list: $taxon" >> "$FAILED_FLAG"; exit 1
+fi
+if ! download_species "$GENOME_DIR/species_list.txt" "$GENOME_DIR"; then
+echo "Failed to download species for $taxon" >> "$FAILED_FLAG"
+fi
 fi
 elif [[ "$taxon" =~ ^[A-Z][a-z]+\ [a-z]+$ ]]; then
 SPECIES_DIR="${GENOME_DIR}/${taxon// /_}"
 if [[ -d "$SPECIES_DIR" ]]; then
 echo "Species $taxon already downloaded. Skipping."
 else
-download_species "$taxon" "$GENOME_DIR"
+if ! download_species "$taxon" "$GENOME_DIR"; then
+echo "Failed to download species: $taxon" >> "$FAILED_FLAG"
+fi
 fi
 fi
 ) &
@@ -281,11 +301,16 @@ while (( $(jobs -r | wc -l) >= max_parallel_jobs )); do
 sleep 1
 done
 done < "$DOWNLOAD_FILE"
+wait
 echo "Organizing unclassified genomes"
 move_unclassified_genomes "$GENOME_DIR"
 echo "Building BLAST databases for custom panel"
 build_blastdb "$GENOME_DIR" "$BLAST_DB_DIR"
+if [[ -s "$FAILED_FLAG" ]]; then
+echo "Custom panel completed with some failures. See $FAILED_FLAG"
+else
 echo "Custom panel build complete."
+fi
 else
 GENOME_DIR=""
 echo "Default mode: using prebuilt BLAST database."
