@@ -1,10 +1,24 @@
 #!/bin/bash
 MONOPHASIC_TYPHIMURIUM_LIST="$(pwd)/database/monophasic_Typhimurium_list.txt"
 ASSEMBLY_LEVEL="complete"
+# Get CPU count (SLURM-aware)
+function get_cpus() {
+if [[ -n "${SLURM_CPUS_ON_NODES:-}" ]]; then
+echo "$SLURM_CPUS_ON_NODE"
+else
+nproc
+fi
+}
 # Build a function to download genus-level genomes using ncbi-genome-download
 function download_genus() {
-local genus="$1"
+local input="$1"
 local output_dir="$2"
+local total_cpus=$(get_cpus)
+local cores_half=$(( total_cpus / 2 ))
+local max_parallel_genus=$(( cores_half < 1 ? 1 : (cores_half > 6 ? 6 : cores_half) ))
+# Download a single genus
+download_single_genus() {
+local genus="$1"
 local genus_dir="${output_dir}/${genus}/aggregated"
 if [[ -n "$(find "$genus_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
 echo "Genomes already exist for $genus, skipping"
@@ -16,6 +30,18 @@ ncbi-genome-download bacteria --genera "$genus" --assembly-level "$ASSEMBLY_LEVE
 find "$genus_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$0" && mv "${0%.gz}" "'"$genus_dir"'"' {} \;
 rm -rf "$genus_dir/genbank"
 echo "Downloaded and organized genomes for $genus"
+}
+if [[ -f "$input" ]]; then
+while read -r genus; do
+(
+download_single_genus "$genus"
+) &
+while (( $(jobs -r | wc -l) >= max_parallel_genus )); do sleep 1; done
+done < "$input"
+wait
+else
+download_single_genus "$input"
+fi
 }
 # Build a function to get all species names under each target genus
 function get_species_list() {
@@ -31,42 +57,24 @@ echo "Saved all species names of $target_genus in species_list.txt"
 
 # Build a function to download species-level genomes using ncbi-genome-download
 function download_species() {
-local target_genus="$1"
+local target_input="$1"
 local output_dir="$2"
-local species_list_file="${output_dir}/species_list.txt"
-# Detect available CPU cores
-local total_cpus
-if [[ -n "${SLURM_CPUS_ON_NODE:-}" ]]; then
-total_cpus=$SLURM_CPUS_ON_NODE
-else
-total_cpus=$(nproc)
-fi
-# Throttle species-level jobs
-local max_parallel_species
+local total_cpus=$(get_cpus)
 local cores_half=$(( total_cpus / 2 ))
-if (( cores_half < 1 )); then
-max_parallel_species=1
-elif (( cores_half > 4 )); then
-max_parallel_species=4
-else
-max_parallel_species=$core_half
-fi
-while read -r SPECIES; do
-local genus=$(echo "$SPECIES" | awk '{print $1}')
-if [[ "$genus" != "$target_genus" ]]; then
-continue
-fi
-(
-local clean_species=$(echo "$SPECIES" | sed 's/ /_/g')
+local max_parallel_species=$(( cores_half < 1 ? 1 : (cores_half > 4 ? 4 : cores_half) ))
+download_single_species() {
+local species="$1"
+local genus=$(echo "$species" | awk '{print $1}')
+local clean_species=$(echo "$species" | sed 's/ /_/g')
 local species_dir="${output_dir}/${genus}/${clean_species}"
-[[ "$SPECIES" == "Salmonella enterica" ]] && species_dir="$species_dir/aggregated"
+[[ "$species" == "Salmonella enterica" ]] && species_dir="$species_dir/aggregated"
 mkdir -p "$species_dir"
 if [[ -n "$(find "$species_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
-echo "Genomes already exist for $SPECIES, skipping donwloading"
-exit 0
+echo "Genomes already exist for $species, skipping donwloading"
+return
 fi
-echo "Downloading genomes for $SPECIES"
-ncbi-genome-download bacteria --genera "$SPECIES" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$species_dir" --verbose
+echo "Downloading genomes for $species"
+ncbi-genome-download bacteria --genera "$species" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$species_dir" --verbose
 # Move genomic FASTA files to correct location
 if [[ -d "$species_dir/genbank" ]]; then
 find "$species_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$0" && mv "${0%.gz}" "'"$species_dir"'"' {} \;
@@ -76,13 +84,18 @@ if [[ -z "$(find "$species_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev
 echo "No genomes found for $SPECIES. Remove empty directory."
 rm -rf "$species_dir"
 fi
-) &
-while (( $(jobs -r | wc -l) >= max_parallel_species )); do
-sleep 1
-done
-done < "$species_list_file"
+}
+if [[ -f "$target_input" ]]; then
+while read -r species; do
+[[ -z "$species" ]] && continue
+( download_single_species "$species" ) &
+while (( $(jobs -r | wc -l) >= max_parallel_species )); do sleep 1; done
+done < "$target_input"
 wait
-echo "Downloaded and organized species genomes for $target_genus"
+else
+download_single_species "$target_input"
+fi
+echo "Downloaded and organized species genomes"
 }
 
 # Build a function to get all subspecies names under Salmonella enterica
@@ -119,7 +132,7 @@ fi
 done < "$subspecies_list"
 }
 
-# Build a function to get all serotype names under Salmonella enterica subsp. enterica
+# Build a function to download Salmonella serotype
 function get_salmonella_serotype_list() {
 local output_dir="$1"
 mkdir -p "$output_dir"
@@ -133,15 +146,20 @@ awk 'NR==FNR {monophasic[$0]; next} !($0 in monophasic)' "$MONOPHASIC_TYPHIMURIU
 
 function download_salmonella_serotype() {
 local output_dir="$1"
-echo "Downloading all Salmonella enterica subsp. enterica serotype complete genomes..."
-monophasic_dir="$GENOME_DIR/Salmonella/Salmonella_enterica/enterica/monophasic_Typhimurium"
+local total_cpus=$(get_cpus)
+local max_parallel_serotypes=$(( total_cpus / 4 ))
+(( max_parallel_serotypes < 1 )) && max_parallel_serotypes=1
+(( max_parallel_serotypes > 6 )) && max_parallel_serotypes=6
+echo "Downloading Salmonella enterica subsp. enterica serotype complete genomes"
+local monophasic_dir="$GENOME_DIR/Salmonella/Salmonella_enterica/enterica/monophasic_Typhimurium"
 mkdir -p "$monophasic_dir"
-while read -r serotype; do
+download_single_serotype() {
+local serotype="$1"
 local serotype_dir="${GENOME_DIR}/Salmonella/Salmonella_enterica/enterica/${serotype}"
 mkdir -p "$serotype_dir"
 if [[ -n "$(find "$serotype_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
 echo "Genomes already exist for Salmonella enterica $serotype, skipping."
-continue
+return
 fi
 echo "Downloading genomes for Salmonella $serotype"
 ncbi-genome-download bacteria --genera "Salmonella enterica subsp. enterica serovar $serotype" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$serotype_dir" --verbose
@@ -153,31 +171,26 @@ if [[ -z "$(find "$serotype_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/de
 echo "No genomes found for $subspecies. Remove empty directory."
 rm -rf "$serotype_dir"
 fi
+}
+while read -r serotype; do
+[[ -z "$serotype" ]] && continue
+(download_single_serotype "$serotype" ) &
+while (( $(jobs -r | wc -l) >= max_parallel_serotypes )); do sleep 1; done
 done < "${output_dir}/salmonella_serotype_list.txt"
+wait
 echo "Downloading all monophasic Typhimurium genomes"
 while read -r monophasic; do
+[[ -z "$monophasic" ]] && continue
+(
 ncbi-genome-download bacteria --genera "Salmonella enterica subsp. enterica serovar $monophasic" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$monophasic_dir" --verbose
 if [[ -d "$monophasic_dir/genbank" ]]; then
 find "$monophasic_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$1" && mv "${1%.gz}" "'"$monophasic_dir"'"' _ {} \;
 rm -rf "$monophasic_dir/genbank"
 fi
+) &
+while (( $(jons -r | wc -l) >= max_parallel_serotypes )); do sleep 1; done
 done < "$MONOPHASIC_TYPHIMURIUM_LIST"
-}
-
-function download_single_serotype() {
-local serotype="$1"
-local output_dir="${GENOME_DIR}/Salmonella/Salmonella_enterica/enterica/${serotype}"
-echo "Downloading genomes for Salmonella $serotype..."
-mkdir -p "$output_dir"
-ncbi-genome-download bacteria --genera "Salmonella enterica subsp. enterica serovar $serotype" --assembly-level "$ASSEMBLY_LEVEL" --formats fasta --section genbank --output-folder "$output_dir" --verbose
-if [[ -d "$output_dir/genbank" ]]; then
-find "$output_dir/genbank" -type f -name "*_genomic.fna.gz" -exec sh -c 'gzip -d "$1" && mv "${1%.gz}" "'"$output_dir"'"' _ {} \;
-rm -rf "$output_dir/genbank"
-fi
-if [[ -z "$(find "$output_dir" -maxdepth 1 -type f -name "*_genomic.fna" 2>/dev/null)" ]]; then
-echo "No genomes found for $subspecies. Remove empty directory."
-rm -rf "$output_dir"
-fi
+wait
 }
 
 function move_unclassified_genomes() {

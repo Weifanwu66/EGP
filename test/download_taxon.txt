@@ -1,2 +1,3 @@
-Listeria
-Bacillus subtilis
+Listeria monocytogenes
+Bacillus
+Staphylococcus

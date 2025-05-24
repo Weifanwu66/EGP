@@ -264,7 +264,7 @@ if ! download_salmonella_serotype "$GENOME_DIR"; then
 echo "Failed to download serotypes" >> "$FAILED_FLAG"; exit 1
 fi
 elif [[ "$taxon" =~ ^Salmonella( enterica subsp\.?\ enterica serovar)? ([A-Z][a-zA-Z0-9_]+)$ ]]; then
-serotype="${BASH_REMATCH[1]}"
+serotype="${BASH_REMATCH[2]}"
 echo "Downloading $serotype"
 echo "$serotype" > "$GENOME_DIR/temp_serotype_list.txt"
 if ! download_salmonella_serotype "$GENOME_DIR" "$GENOME_DIR/temp_serotype_list.txt"; then
